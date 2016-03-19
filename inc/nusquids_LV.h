@@ -32,27 +32,29 @@ class nuSQUIDSLV: public nuSQUIDS {
 
     void AddToWriteHDF5(hid_t hdf5_loc_id) const {
       // here we write the new parameters to be saved in the HDF5 file
-      hid_t lv = H5Gcreate(hdf5_loc_id, "c_values", H5P_DEFAULT, H5P_DEFAULT, H5P_DEFAULT);
+      hsize_t dim[1]{1};
+      hid_t lv = H5LTmake_dataset(hdf5_loc_id,"c_values",1,dim,H5T_NATIVE_DOUBLE,0);
+      //hid_t lv = H5Dcreate(hdf5_loc_id, "c_values", H5T_NATIVE_INT, space_id, H5P_DEFAULT, H5P_DEFAULT, H5P_DEFAULT);
+      //hid_t lv = H5Gcreate(hdf5_loc_id, "c_values", H5P_DEFAULT, H5P_DEFAULT, H5P_DEFAULT);
       double cmutaur = GSL_REAL(c_params.c_mutau);
       double cmutaui = GSL_IMAG(c_params.c_mutau);
-      H5LTset_attribute_double(lv,"c_values","c_mu_tau_real" ,&(cmutaur),1);
-      H5LTset_attribute_double(lv,"c_values","c_mu_tau_imag" ,&(cmutaui),1);
+      H5LTset_attribute_double(hdf5_loc_id,"c_values","c_mu_tau_real" ,&(cmutaur),1);
+      H5LTset_attribute_double(hdf5_loc_id,"c_values","c_mu_tau_imag" ,&(cmutaui),1);
       double cemur = GSL_REAL(c_params.c_emu);
       double cemui = GSL_IMAG(c_params.c_emu);
-      H5LTset_attribute_double(lv,"c_values","c_mu_tau_real" ,&(cemur),1);
-      H5LTset_attribute_double(lv,"c_values","c_mu_tau_imag" ,&(cemui),1);
-      H5Gclose(lv);
+      H5LTset_attribute_double(hdf5_loc_id,"c_values","c_e_mu_real" ,&(cemur),1);
+      H5LTset_attribute_double(hdf5_loc_id,"c_values","c_e_mu_imag" ,&(cemui),1);
     }
 
     void AddToReadHDF5(hid_t hdf5_loc_id){
       double cmutaur,cmutaui,cemur,cemui;
       // here we read the new parameters now saved in the HDF5 file
-      hid_t lv = H5Gopen(hdf5_loc_id, "c_valuls", H5P_DEFAULT);
-      H5LTget_attribute_double(lv,"c_values","c_mu_tau_real" ,&(cmutaur));
-      H5LTget_attribute_double(lv,"c_values","c_mu_tau_imag" ,&(cmutaui));
-      H5LTget_attribute_double(lv,"c_values","c_mu_tau_real" ,&(cemur));
-      H5LTget_attribute_double(lv,"c_values","c_mu_tau_imag" ,&(cemui));
-      H5Gclose(lv);
+      //hid_t lv = H5Gopen(hdf5_loc_id, "c_values", H5P_DEFAULT);
+      //H5Gclose(lv);
+      H5LTget_attribute_double(hdf5_loc_id,"c_values","c_mu_tau_real" ,&(cmutaur));
+      H5LTget_attribute_double(hdf5_loc_id,"c_values","c_mu_tau_imag" ,&(cmutaui));
+      H5LTget_attribute_double(hdf5_loc_id,"c_values","c_e_mu_real" ,&(cemur));
+      H5LTget_attribute_double(hdf5_loc_id,"c_values","c_e_mu_imag" ,&(cemui));
       c_params = {gsl_complex_rect(cemur,cemui),gsl_complex_rect(cmutaur,cmutaui)};
       Set_LV_CMatrix(c_params);
     }
