@@ -1,4 +1,5 @@
 #include <vector>
+#include <deque>
 #include <iostream>
 #include <nuSQuIDS/nuSQuIDS.h>
 #include "nusquids_LV.h"
@@ -7,9 +8,6 @@
 
 // chris weaver tools
 #include <PhysTools/histogram.h>
-#include "weighting.h"
-#include "autodiff.h"
-#include "likelihood.h"
 #include "event.h"
 #include "gsl_integrate_wrap.h"
 #include "chris_reads.h"
