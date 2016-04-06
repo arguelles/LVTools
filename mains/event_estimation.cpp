@@ -33,6 +33,7 @@ double GetAveragedFlux(nuSQUIDSAtm<nuSQUIDSLV> * nus,PTypes flavor, double costh
 
 double GetAveragedFlux(nuSQUIDSAtm<nuSQUIDSLV> * nus,PTypes flavor, double costh_min, double costh_max, double enu_min, double enu_max) {
   return (GetAveragedFlux(nus,flavor,costh_max,enu_min,enu_max) + GetAveragedFlux(nus,flavor,costh_min,enu_min,enu_max))/2.;
+  //return GetAveragedFlux(nus,flavor,(costh_max+costh_min)/2.,enu_min,enu_max);
 }
 
 //===================MAIN======================================================//
@@ -111,20 +112,18 @@ int main(int argc, char** argv)
                         p = (flavor == NUMU) ? 0 : 1;
                         y = (year == y2010) ? 0 : 1;
                         double solid_angle = 2.*PI_CONSTANT*(edges[year][flavor][coszenith_index][ci+1]-edges[year][flavor][coszenith_index][ci]);
-                        kaon_event_expectation[year][ci][pi] += solid_angle*m2Tocm2*livetime[year]*areas[year][flavor][ei][ci][pi]*GetAveragedFlux(&nus_kaon,flavor,
+                        double DOM_eff_correction = 1.; // this correction is flux dependent, we will need to fix this.
+                        // double DOM_eff_correction =*index_multi(*convDOMEffCorrection[y],indices);
+                        kaon_event_expectation[year][ci][pi] += DOM_eff_correction*solid_angle*m2Tocm2*livetime[year]*areas[year][flavor][ei][ci][pi]*GetAveragedFlux(&nus_kaon,flavor,
                                                                                                                        edges[year][flavor][coszenith_index][ci],
                                                                                                                        edges[year][flavor][coszenith_index][ci+1],
                                                                                                                        edges[year][flavor][neutrino_energy_index][ei],
                                                                                                                        edges[year][flavor][neutrino_energy_index][ei+1]);
-                        pion_event_expectation[year][ci][pi] += solid_angle*m2Tocm2*livetime[year]*areas[year][flavor][ei][ci][pi]*GetAveragedFlux(&nus_pion,flavor,
+                        pion_event_expectation[year][ci][pi] += DOM_eff_correction*solid_angle*m2Tocm2*livetime[year]*areas[year][flavor][ei][ci][pi]*GetAveragedFlux(&nus_pion,flavor,
                                                                                                                        edges[year][flavor][coszenith_index][ci],
                                                                                                                        edges[year][flavor][coszenith_index][ci+1],
                                                                                                                        edges[year][flavor][neutrino_energy_index][ei],
                                                                                                                        edges[year][flavor][neutrino_energy_index][ei+1]);
-                        // applying DOM efficiency correction
-                        //double DOM_eff_correction =*index_multi(*convDOMEffCorrection[y],indices);
-                        //kaon_event_expectation[year][ci][pi] *= DOM_eff_correction;
-                        //pion_event_expectation[year][ci][pi] *= DOM_eff_correction;
                     }
                 }
             }
@@ -198,7 +197,7 @@ int main(int argc, char** argv)
     std::ofstream output_file(output_file_str);
     for(auto event : mc_events){
       //std::cout << event.conv_pion_event << " " << event.conv_kaon_event << std::endl;
-      output_file << event.energy_proxy << " " << event.costh << " " << event.year << " " << event.conv_pion_event + pikr*event.conv_kaon_event << std::endl;
+      output_file << event.energy_proxy << " " << event.costh << " " << event.year << " " << event.conv_kaon_event << " " << event.conv_pion_event << " " << event.conv_pion_event + pikr*event.conv_kaon_event << std::endl;
     }
     output_file.close();
 

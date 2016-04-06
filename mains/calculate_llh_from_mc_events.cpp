@@ -11,7 +11,6 @@
 #include "autodiff.h"
 #include "likelihood.h"
 #include "event.h"
-#include "gsl_integrate_wrap.h"
 
 using namespace nusquids;
 
@@ -65,26 +64,6 @@ template<typename ContainerType, typename HistType, typename BinnerType>
 void bin(const ContainerType& data, HistType& hist, const BinnerType& binner){
   for(const Event& event : data)
     binner(hist,event);
-}
-
-double GetAveragedFlux(nuSQUIDSAtm<nuSQUIDSLV> * nus,PTypes flavor, double costh, double enu_min, double enu_max) {
-    if(enu_min > enu_max)
-      throw std::runtime_error("Min energy in the bin larger than large energy in the bin.");
-    if (enu_min >= 1.0e6)
-      return 0.;
-    if (enu_max <= 1.0e2)
-      return 0.;
-    double GeV = 1.0e9;
-    if (flavor == NUMU){
-        return integrate([&](double enu){return(nus->EvalFlavor(1,costh,enu*GeV,0));},enu_min,enu_max);
-    } else {
-        return integrate([&](double enu){return(nus->EvalFlavor(1,costh,enu*GeV,1));},enu_min,enu_max);
-    }
-}
-
-double GetAveragedFlux(nuSQUIDSAtm<nuSQUIDSLV> * nus,PTypes flavor, double costh_min, double costh_max, double enu_min, double enu_max) {
-  return (GetAveragedFlux(nus,flavor,costh_max,enu_min,enu_max) + GetAveragedFlux(nus,flavor,costh_min,enu_min,enu_max))/2.;
-  //return GetAveragedFlux(nus,flavor,(costh_max+costh_min)/2.,enu_min,enu_max);
 }
 
 //==================== NUISANCE PARAMETERS REWEIGHTERS =========================//
@@ -179,19 +158,19 @@ public:
 
 int main(int argc, char** argv)
 {
-    if(argc < 5){
+    if(argc < 4){
         std::cout << "Invalid number of arguments. The arguments should be given as follows: \n"
                      "1) Path to the effective area hdf5.\n"
                      "2) Path to the observed events file.\n"
-                     "3) Path to the kaon component nusquids calculated flux.\n"
-                     "4) Path to the pion component nusquids calculated flux.\n"
-                     "5) [optional] Path to output the event expectations.\n"
+                     "3) Path to expectation histogram.\n"
+                     "4) [optional] Path to output the event expectations.\n"
                      << std::endl;
         exit(1);
     }
 
     //============================== SETTINGS ===================================//
     //============================== SETTINGS ===================================//
+
     bool quiet = false;
     size_t evalThreads=1;
     std::vector<double> fitSeed {1.,0.,1.}; // normalization, deltaGamma, pi/K ratio
@@ -204,12 +183,13 @@ int main(int argc, char** argv)
     //============================== SETTINGS ===================================//
     //============================== SETTINGS ===================================//
 
-    // read nusquids calculated flux
-    if(!quiet){
-      std::cout << "Loading nuSQuIDS fluxes." << std::endl;
-    }
-    nuSQUIDSAtm<nuSQUIDSLV> nus_kaon((std::string(argv[3])));
-    nuSQUIDSAtm<nuSQUIDSLV> nus_pion((std::string(argv[4])));
+    // here we need the bin edges which are on the effective area file
+    // we are going to use the edges to make the histograms
+    const unsigned int neutrino_energy_index = 0;
+    const unsigned int coszenith_index = 1;
+    const unsigned int proxy_energy_index = 2;
+    AreaEdges edges;
+    AreaArray areas = get_areas(std::string(argv[1]), edges);
 
     //============================= begin read data  =============================//
     if(!quiet){
@@ -224,85 +204,28 @@ int main(int argc, char** argv)
     }
     //============================= end read data  =============================//
 
-    //============================= begin calculating event expectation  =============================//
+    //============================= begin loading event expectation =============================//
     if(!quiet){
-      std::cout << "Calculating event expectation using effective area." << std::endl;
+      std::cout << "Reading expectation from file." << std::endl;
     }
-    const unsigned int neutrino_energy_index = 0;
-    const unsigned int coszenith_index = 1;
-    const unsigned int proxy_energy_index = 2;
-    AreaEdges edges;
-    AreaArray areas = get_areas(std::string(argv[1]), edges);
-
-    //std::cout << "Printing out the number of edges. Just a sanity check." << std::endl;
-    //std::cout << edges[y2010][NUMU][neutrino_energy_index].extent(0) << std::endl;
-    //std::cout << edges[y2010][NUMU][coszenith_index].extent(0) << std::endl;
-    //std::cout << edges[y2010][NUMU][proxy_energy_index].extent(0) << std::endl;
-
-    const unsigned int neutrinoEnergyBins=280;
-    const unsigned int cosZenithBins=11;
-    const unsigned int energyProxyBins=50;
-    const unsigned int number_of_years = 2;
-    const double PI_CONSTANT = 3.141592;
-    const double m2Tocm2 = 1.0e4;
-    std::map<Year,double> livetime {{y2010,2.7282e+07},{y2011,2.96986e+07}}; // in seconds
-
-    nusquids::marray<double,3> kaon_event_expectation{number_of_years,cosZenithBins,energyProxyBins};
-    for(auto it = kaon_event_expectation.begin(); it < kaon_event_expectation.end(); it++)
-        *it = 0.;
-
-    nusquids::marray<double,3> pion_event_expectation{number_of_years,cosZenithBins,energyProxyBins};
-    for(auto it = pion_event_expectation.begin(); it < pion_event_expectation.end(); it++)
-        *it = 0.;
-
-    for(Year year : {y2010,y2011}){
-        for(PTypes flavor : {NUMU,NUMUBAR}){
-            for(unsigned int ci = 0; ci < cosZenithBins; ci++){
-                for(unsigned int pi = 0; pi < energyProxyBins; pi++){
-                    for(unsigned int ei = 0; ei < neutrinoEnergyBins; ei++){
-                        double solid_angle = 2.*PI_CONSTANT*(edges[year][flavor][coszenith_index][ci+1]-edges[year][flavor][coszenith_index][ci]);
-                        double DOM_eff_correction = 1.; // this correction is flux dependent, we will need to fix this.
-                        // double DOM_eff_correction =*index_multi(*convDOMEffCorrection[y],indices);
-                        kaon_event_expectation[year][ci][pi] += DOM_eff_correction*solid_angle*m2Tocm2*livetime[year]*areas[year][flavor][ei][ci][pi]*GetAveragedFlux(&nus_kaon,flavor,
-                                                                                                                       edges[year][flavor][coszenith_index][ci],
-                                                                                                                       edges[year][flavor][coszenith_index][ci+1],
-                                                                                                                       edges[year][flavor][neutrino_energy_index][ei],
-                                                                                                                       edges[year][flavor][neutrino_energy_index][ei+1]);
-                        pion_event_expectation[year][ci][pi] += DOM_eff_correction*solid_angle*m2Tocm2*livetime[year]*areas[year][flavor][ei][ci][pi]*GetAveragedFlux(&nus_pion,flavor,
-                                                                                                                       edges[year][flavor][coszenith_index][ci],
-                                                                                                                       edges[year][flavor][coszenith_index][ci+1],
-                                                                                                                       edges[year][flavor][neutrino_energy_index][ei],
-                                                                                                                       edges[year][flavor][neutrino_energy_index][ei+1]);
-                    }
-                }
-            }
-        }
-    }
-
-    // to keep the code simple we are going to construct fake MC events
-    // which weights are just the expectation value. The advantage of this is that
-    // when we have the actual IceCube MC the following code can be reused. Love, CA.
-
+    marray<double,2> expectation_events = quickread(std::string(argv[3]));
     std::deque<Event> mc_events;
 
-    for(Year year : {y2010,y2011}){
-      for(unsigned int ci = 0; ci < cosZenithBins; ci++){
-        for(unsigned int pi = 0; pi < energyProxyBins; pi++){
-          // we are going to save the bin content and label it at the bin center
-          mc_events.push_back(Event((edges[year][flavor][proxy_energy_index][pi]+edges[year][flavor][proxy_energy_index][pi+1])/2., // energy proxy bin center
-                                    (edges[year][flavor][coszenith_index][ci]+edges[year][flavor][coszenith_index][ci+1])/2., // costh bin center
-                                    year == y2010 ? 2010 : 2011, // year
-                                    kaon_event_expectation[year][ci][pi], // amount of kaon component events
-                                    pion_event_expectation[year][ci][pi])); // amount of pion component events
-        }
-      }
+    for(unsigned int irow = 0; irow < observed_data.extent(0); irow++){
+      mc_events.push_back(Event(expectation_events[irow][0], // energy proxy bin center
+                                expectation_events[irow][1], // costh bin center
+                                expectation_events[irow][2], // year
+                                expectation_events[irow][3], // kaon component
+                                expectation_events[irow][4])); // pion component
     }
-    //============================= end calculating event expectation  =============================//
+
+    //============================= end loading event expectation  =============================//
 
     //============================= begin making histograms  =============================//
     if(!quiet){
       std::cout << "Making histograms." << std::endl;
     }
+
     // LLH problem and histogram
     // lets construct to weaver histograms
     using namespace phys_tools::histograms;
@@ -384,15 +307,15 @@ int main(int argc, char** argv)
     }
 
     std::string output_file_str;;
-    if(argc > 5)
-      output_file_str=std::string(argv[5]);
+    if(argc > 4)
+      output_file_str=std::string(argv[4]);
     else
       output_file_str=std::string("./expectation.dat");
 
     std::ofstream output_file(output_file_str);
     auto weighter = DFWM(fr.params);
     for(auto event : mc_events){
-      output_file << event.energy_proxy << " " << event.costh << " " << event.year << " " << weighter(event) << std::endl;
+      output_file << event.energy_proxy << " " << event.costh << " " << event.year << " " << event.conv_kaon_event << " " << event.conv_pion_event << " " << weighter(event) << std::endl;
     }
     output_file.close();
 
