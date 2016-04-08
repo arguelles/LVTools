@@ -1,0 +1,6 @@
+Program explanation
+
+nusquids_LV_atm.cpp : calculates flux with oscillations given LV parameters and flux model
+event_estimation.cpp : calculates expected/MC event histogram given a nusquids file
+calculate_llh_from_mc_events.cpp : given MC histogram does the fitting and gives LLH
+calculate_llh.cpp : does event_estimation.cpp  + calculate_llh_from_mc_events.cpp together in one step
