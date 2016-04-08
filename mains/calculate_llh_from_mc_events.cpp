@@ -212,7 +212,7 @@ int main(int argc, char** argv)
     marray<double,2> expectation_events = quickread(std::string(argv[3]));
     std::deque<Event> mc_events;
 
-    for(unsigned int irow = 0; irow < observed_data.extent(0); irow++){
+    for(unsigned int irow = 0; irow < expectation_events.extent(0); irow++){
       mc_events.push_back(Event(expectation_events[irow][0], // energy proxy bin center
                                 expectation_events[irow][1], // costh bin center
                                 expectation_events[irow][2], // year
