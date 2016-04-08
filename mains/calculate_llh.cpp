@@ -197,7 +197,8 @@ int main(int argc, char** argv)
     std::vector<double> fitSeed {1.,0.,1.}; // normalization, deltaGamma, pi/K ratio
     paramFixSpec fixedParams;
     double minFitEnergy = 4.0e2;
-    double maxFitEnergy = 2.0e4;
+    //double maxFitEnergy = 2.0e4;
+    double maxFitEnergy = 1.8e4;
     double minCosth = -1;
     double maxCosth = 0.2;
 
@@ -260,7 +261,7 @@ int main(int argc, char** argv)
             for(unsigned int ci = 0; ci < cosZenithBins; ci++){
                 for(unsigned int pi = 0; pi < energyProxyBins; pi++){
                     for(unsigned int ei = 0; ei < neutrinoEnergyBins; ei++){
-                        double solid_angle = 2.*PI_CONSTANT*(edges[year][flavor][coszenith_index][ci+1]-edges[year][flavor][coszenith_index][ci]);
+                        double solid_angle = 2.*2.*PI_CONSTANT*(edges[year][flavor][coszenith_index][ci+1]-edges[year][flavor][coszenith_index][ci]);
                         double DOM_eff_correction = 1.; // this correction is flux dependent, we will need to fix this.
                         // double DOM_eff_correction =*index_multi(*convDOMEffCorrection[y],indices);
                         kaon_event_expectation[year][ci][pi] += DOM_eff_correction*solid_angle*m2Tocm2*livetime[year]*areas[year][flavor][ei][ci][pi]*GetAveragedFlux(&nus_kaon,flavor,

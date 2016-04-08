@@ -39,8 +39,8 @@ fitResult doFitLBFGSB(LikelihoodType& likelihood, const std::vector<double>& see
 
   LBFGSB_Driver minimizer;
   //minimizer.addParameter(SEED, MAGIC_NUMBER, MINIMUM, MAXIMUM);
-  minimizer.addParameter(seed[0],.01,0.0); // if the normalization is allow to be zero it all goes crazy.
-  minimizer.addParameter(seed[1],.01,0.0);
+  minimizer.addParameter(seed[0],.001,0.0); // if the normalization is allow to be zero it all goes crazy.
+  minimizer.addParameter(seed[1],.005);
   minimizer.addParameter(seed[2],.01,0.0);
 
   for(auto idx : indicesToFix)
@@ -77,7 +77,7 @@ private:
 public:
 	using result_type=T;
 	powerlawWeighter(T i):index(i){}
-	
+
 	template<typename Event>
 	result_type operator()(const Event& e) const{
 		return(pow((double)e.primaryEnergy,index));
@@ -95,7 +95,7 @@ public:
 	using result_type=T;
 	powerlawTiltWeighter(double me, T dg/*, typename Event::crTiltValues Event::* c*/):
 	medianEnergy(me),deltaIndex(dg)/*,cachedData(c)*/{}
-	
+
 	result_type operator()(const Event& e) const{
 		//const typename Event::crTiltValues& cache=e.*cachedData;
 		result_type weight=pow(e.energy_proxy/medianEnergy,-deltaIndex);
@@ -176,7 +176,8 @@ int main(int argc, char** argv)
     std::vector<double> fitSeed {1.,0.,1.}; // normalization, deltaGamma, pi/K ratio
     paramFixSpec fixedParams;
     double minFitEnergy = 4.0e2;
-    double maxFitEnergy = 2.0e4;
+    //double maxFitEnergy = 2.0e4;
+    double maxFitEnergy = 1.8e4;
     double minCosth = -1;
     double maxCosth = 0.2;
 
@@ -243,11 +244,14 @@ int main(int argc, char** argv)
     auto ep_ub_it = std::lower_bound(energy_proxy_bin_edges.begin(),energy_proxy_bin_edges.end(),maxFitEnergy);
     auto ep_lb_it = std::upper_bound(energy_proxy_bin_edges.begin(),energy_proxy_bin_edges.end(),minFitEnergy);
 
-    std::cout << *costh_ub_it << " " << *costh_lb_it << std::endl;
-    std::cout << *ep_ub_it << " " << *ep_lb_it << std::endl;
+    //for(auto it = zenith_bin_edges.begin(); it < zenith_bin_edges.end(); it++)
+    //  std::cout << *it << std::endl;
+    //std::cout << *costh_ub_it << " " << *costh_lb_it << std::endl;
+    //std::cout << *ep_ub_it << " " << *ep_lb_it << std::endl;
 
-    HistType data_hist(FixedUserDefinedAxis(costh_lb_it,costh_ub_it),
-                       FixedUserDefinedAxis(ep_lb_it,ep_ub_it),
+    HistType data_hist(FixedUserDefinedAxis(ep_lb_it,ep_ub_it),
+                       FixedUserDefinedAxis(zenith_bin_edges.begin(),zenith_bin_edges.end()),
+                       //FixedUserDefinedAxis(costh_lb_it,costh_ub_it),
                        LinearAxis(2010,1));
 
     // fill in the histogram with the data
@@ -295,10 +299,10 @@ int main(int argc, char** argv)
     fitResult fr = doFitLBFGSB(prob,seed,fixedIndices);
 
     if(!quiet)
-      std::cout << "Fitted Hypothesis: ";
+      std::cout << "Fitted Hypothesis (n0,gamma,Pi/K): ";
     for(unsigned int i=0; i<fr.params.size(); i++)
       std::cout << fr.params[i] << ' ';
-    std::cout << std::setprecision(10) << fr.likelihood << std::setprecision(6) << ' ' << (fr.succeeded?"succeeded":"failed") << std::endl;
+    std::cout << "LLH " << std::setprecision(10) << fr.likelihood << std::setprecision(6) << std::endl;
 
     //============================= likelihood problem ends =============================//
 
@@ -310,7 +314,7 @@ int main(int argc, char** argv)
     if(argc > 4)
       output_file_str=std::string(argv[4]);
     else
-      output_file_str=std::string("./expectation.dat");
+      output_file_str=std::string("./expectation_fitted.dat");
 
     std::ofstream output_file(output_file_str);
     auto weighter = DFWM(fr.params);

@@ -111,7 +111,7 @@ int main(int argc, char** argv)
                         indices[2]=pi;
                         p = (flavor == NUMU) ? 0 : 1;
                         y = (year == y2010) ? 0 : 1;
-                        double solid_angle = 2.*PI_CONSTANT*(edges[year][flavor][coszenith_index][ci+1]-edges[year][flavor][coszenith_index][ci]);
+                        double solid_angle = 2.*2.*PI_CONSTANT*(edges[year][flavor][coszenith_index][ci+1]-edges[year][flavor][coszenith_index][ci]);
                         double DOM_eff_correction = 1.; // this correction is flux dependent, we will need to fix this.
                         // double DOM_eff_correction =*index_multi(*convDOMEffCorrection[y],indices);
                         kaon_event_expectation[year][ci][pi] += DOM_eff_correction*solid_angle*m2Tocm2*livetime[year]*areas[year][flavor][ei][ci][pi]*GetAveragedFlux(&nus_kaon,flavor,

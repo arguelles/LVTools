@@ -57,5 +57,5 @@ mains/linpack.o : ./inc/lbfgsb/linpack.c
 
 .PHONY: clean
 clean:
-	rm -rf ./mains/*.exe ./bin/*
+	rm -rf ./mains/*.exe ./bin/* ./mains/*.o
 
