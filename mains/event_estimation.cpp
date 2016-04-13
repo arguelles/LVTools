@@ -101,34 +101,36 @@ int main(int argc, char** argv)
 
     unsigned int indices[3],p,y;
 #ifndef USE_CHRIS_FLUX
-    for(Year year : {y2010,y2011}){
-        for(PTypes flavor : {NUMU,NUMUBAR}){
-            for(unsigned int ci = 0; ci < cosZenithBins; ci++){
-                for(unsigned int pi = 0; pi < energyProxyBins; pi++){
-                    for(unsigned int ei = 0; ei < neutrinoEnergyBins; ei++){
-                        indices[0]=ei;
-                        indices[1]=ci;
-                        indices[2]=pi;
-                        p = (flavor == NUMU) ? 0 : 1;
-                        y = (year == y2010) ? 0 : 1;
-                        double solid_angle = 2.*2.*PI_CONSTANT*(edges[year][flavor][coszenith_index][ci+1]-edges[year][flavor][coszenith_index][ci]);
-                        double DOM_eff_correction = 1.; // this correction is flux dependent, we will need to fix this.
-                        // double DOM_eff_correction =*index_multi(*convDOMEffCorrection[y],indices);
-                        kaon_event_expectation[year][ci][pi] += DOM_eff_correction*solid_angle*m2Tocm2*livetime[year]*areas[year][flavor][ei][ci][pi]*GetAveragedFlux(&nus_kaon,flavor,
-                                                                                                                       edges[year][flavor][coszenith_index][ci],
-                                                                                                                       edges[year][flavor][coszenith_index][ci+1],
-                                                                                                                       edges[year][flavor][neutrino_energy_index][ei],
-                                                                                                                       edges[year][flavor][neutrino_energy_index][ei+1]);
-                        pion_event_expectation[year][ci][pi] += DOM_eff_correction*solid_angle*m2Tocm2*livetime[year]*areas[year][flavor][ei][ci][pi]*GetAveragedFlux(&nus_pion,flavor,
-                                                                                                                       edges[year][flavor][coszenith_index][ci],
-                                                                                                                       edges[year][flavor][coszenith_index][ci+1],
-                                                                                                                       edges[year][flavor][neutrino_energy_index][ei],
-                                                                                                                       edges[year][flavor][neutrino_energy_index][ei+1]);
-                    }
-                }
+      for(PTypes flavor : {NUMU,NUMUBAR}){
+        for(unsigned int ei = 0; ei < neutrinoEnergyBins; ei++){
+          for(unsigned int ci = 0; ci < cosZenithBins; ci++){
+            double kaon_integrated_flux = GetAveragedFlux(&nus_kaon,flavor,
+                                                           edges[y2010][flavor][coszenith_index][ci],
+                                                           edges[y2010][flavor][coszenith_index][ci+1],
+                                                           edges[y2010][flavor][neutrino_energy_index][ei],
+                                                           edges[y2010][flavor][neutrino_energy_index][ei+1]);
+            double pion_integrated_flux = GetAveragedFlux(&nus_pion,flavor,
+                                                           edges[y2010][flavor][coszenith_index][ci],
+                                                           edges[y2010][flavor][coszenith_index][ci+1],
+                                                           edges[y2010][flavor][neutrino_energy_index][ei],
+                                                           edges[y2010][flavor][neutrino_energy_index][ei+1]);
+            for(unsigned int pi = 0; pi < energyProxyBins; pi++){
+              for(Year year : {y2010,y2011}){
+                  indices[0]=ei;
+                  indices[1]=ci;
+                  indices[2]=pi;
+                  p = (flavor == NUMU) ? 0 : 1;
+                  y = (year == y2010) ? 0 : 1;
+                  double solid_angle = 2.*2.*PI_CONSTANT*(edges[year][flavor][coszenith_index][ci+1]-edges[year][flavor][coszenith_index][ci]);
+                  double DOM_eff_correction = 1.; // this correction is flux dependent, we will need to fix this.
+                  // double DOM_eff_correction =*index_multi(*convDOMEffCorrection[y],indices);
+                  kaon_event_expectation[year][ci][pi] += DOM_eff_correction*solid_angle*m2Tocm2*livetime[year]*areas[year][flavor][ei][ci][pi]*kaon_integrated_flux;
+                  pion_event_expectation[year][ci][pi] += DOM_eff_correction*solid_angle*m2Tocm2*livetime[year]*areas[year][flavor][ei][ci][pi]*pion_integrated_flux;
+              }
             }
+          }
         }
-    }
+      }
 #else
     //these share the same binning in the first two dimensions
     multidim convAtmosNuMu=alloc_multi(2,histogramDims);
