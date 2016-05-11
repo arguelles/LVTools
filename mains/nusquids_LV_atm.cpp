@@ -37,7 +37,7 @@ int main()
   //LVParameters c_test {gsl_complex_rect(1.0e-27,0),GSL_COMPLEX_ZERO};
   // this is c_mutau only
   double c_mutau = 1.0e-27;
-  c_mutau = 0.;
+//  c_mutau = 0.;
   LVParameters c_parameters {GSL_COMPLEX_ZERO,gsl_complex_rect(c_mutau,0)};
   for(auto & ns : nus.GetnuSQuIDS()){
     ns.Set_LV_CMatrix(c_parameters);
@@ -80,7 +80,7 @@ int main()
 
   // we can save the current state in HDF5 format
   // for future use.
-  nus.WriteStateHDF5("./nusquids_LV_"+meson+"_"+modelname+".hdf5");
+  nus.WriteStateHDF5("./nusquids_LV_"+meson+"_"+modelname+"_"+std::to_string(c_mutau)+".hdf5");
 
   return 0;
 }

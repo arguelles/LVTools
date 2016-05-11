@@ -1,6 +1,7 @@
 #include <vector>
 #include <deque>
 #include <iostream>
+#include <iomanip>
 #include <nuSQuIDS/nuSQuIDS.h>
 #include "nusquids_LV.h"
 #include "get_eff_area.h"
@@ -12,7 +13,7 @@
 #include "gsl_integrate_wrap.h"
 #include "chris_reads.h"
 
-//#define USE_CHRIS_FLUX
+#define USE_CHRIS_FLUX
 
 using namespace nusquids;
 
@@ -121,7 +122,7 @@ int main(int argc, char** argv)
                   indices[2]=pi;
                   p = (flavor == NUMU) ? 0 : 1;
                   y = (year == y2010) ? 0 : 1;
-                  double solid_angle = 2.*2.*PI_CONSTANT*(edges[year][flavor][coszenith_index][ci+1]-edges[year][flavor][coszenith_index][ci]);
+                  double solid_angle = 2.*PI_CONSTANT*(edges[year][flavor][coszenith_index][ci+1]-edges[year][flavor][coszenith_index][ci]);
                   double DOM_eff_correction = 1.; // this correction is flux dependent, we will need to fix this.
                   // double DOM_eff_correction =*index_multi(*convDOMEffCorrection[y],indices);
                   kaon_event_expectation[year][ci][pi] += DOM_eff_correction*solid_angle*m2Tocm2*livetime[year]*areas[year][flavor][ei][ci][pi]*kaon_integrated_flux;
@@ -143,7 +144,6 @@ int main(int argc, char** argv)
     readDataSet(file_id, "/nu_mu_bar/integrated_flux", convAtmosNuMuBar.data);
 
     H5Fclose(file_id);
-
     //unsigned int indices[3],p,y;
     for(Year year : {y2010,y2011}){
         for(PTypes flavor : {NUMU,NUMUBAR}){
@@ -158,7 +158,6 @@ int main(int argc, char** argv)
                         y = (year == y2010) ? 0 : 1;
                         double fluxIntegral=*index_multi(*convAtmosFlux[p],indices);
                         double DOM_eff_correction =*index_multi(*convDOMEffCorrection[y],indices);
-                        //double DOM_eff_correction = 1.;
                         // chris does not separate between pions and kaon components. Lets just drop it all in the kaons.
                         // also chris has already included the solid angle factor in the flux
                         kaon_event_expectation[year][ci][pi] += m2Tocm2*livetime[year]*areas[year][flavor][ei][ci][pi]*DOM_eff_correction*fluxIntegral;
@@ -195,7 +194,11 @@ int main(int argc, char** argv)
     else
       output_file_str=std::string("./expectation.dat");
 
+#ifndef USE_CHRIS_FLUX
     double pikr = 1.1;
+#else
+    double pikr = 1.0;
+#endif
     std::ofstream output_file(output_file_str);
     for(auto event : mc_events){
       //std::cout << event.conv_pion_event << " " << event.conv_kaon_event << std::endl;
