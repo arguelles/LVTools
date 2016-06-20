@@ -475,7 +475,8 @@ namespace likelihood{
 				}
 				
 				auto contribution=likelihoodFunction(observationAmount,expectationWeights);
-				/*{
+        /*
+				{
 					std::lock_guard<std::mutex> lck(printMtx);
 					DataType expectationAmount=std::accumulate(expectationWeights.begin(),expectationWeights.end(),DataType(0));
 					std::cout << "   obs coords:";

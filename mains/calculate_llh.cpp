@@ -9,6 +9,7 @@
 #include <PhysTools/histogram.h>
 #include "weighting.h"
 #include "autodiff.h"
+//#include "likelihood_cool.h"
 #include "likelihood.h"
 #include "event.h"
 #include "gsl_integrate_wrap.h"
@@ -40,15 +41,17 @@ fitResult doFitLBFGSB(LikelihoodType& likelihood, const std::vector<double>& see
 
   LBFGSB_Driver minimizer;
   //minimizer.addParameter(SEED, MAGIC_NUMBER, MINIMUM, MAXIMUM);
-  minimizer.addParameter(seed[0],.01,0.0); // if the normalization is allow to be zero it all goes crazy.
-  minimizer.addParameter(seed[1],.01,0.0);
+  minimizer.addParameter(seed[0],.001,0.0); // if the normalization is allow to be zero it all goes crazy.
+  minimizer.addParameter(seed[1],.005);
   minimizer.addParameter(seed[2],.01,0.0);
 
   for(auto idx : indicesToFix)
     minimizer.fixParameter(idx);
 
   minimizer.setChangeTolerance(1e-5);
+
   minimizer.setHistorySize(20);
+  std::cout << seed[0] << " " << seed[1] << " " << seed[2] << std::endl;
 
   fitResult result;
   result.succeeded=minimizer.minimize(BFGS_Function<LikelihoodType>(likelihood));
@@ -256,28 +259,36 @@ int main(int argc, char** argv)
     for(auto it = pion_event_expectation.begin(); it < pion_event_expectation.end(); it++)
         *it = 0.;
 
-    for(Year year : {y2010,y2011}){
-        for(PTypes flavor : {NUMU,NUMUBAR}){
-            for(unsigned int ci = 0; ci < cosZenithBins; ci++){
-                for(unsigned int pi = 0; pi < energyProxyBins; pi++){
-                    for(unsigned int ei = 0; ei < neutrinoEnergyBins; ei++){
-                        double solid_angle = 2.*2.*PI_CONSTANT*(edges[year][flavor][coszenith_index][ci+1]-edges[year][flavor][coszenith_index][ci]);
-                        double DOM_eff_correction = 1.; // this correction is flux dependent, we will need to fix this.
-                        // double DOM_eff_correction =*index_multi(*convDOMEffCorrection[y],indices);
-                        kaon_event_expectation[year][ci][pi] += DOM_eff_correction*solid_angle*m2Tocm2*livetime[year]*areas[year][flavor][ei][ci][pi]*GetAveragedFlux(&nus_kaon,flavor,
-                                                                                                                       edges[year][flavor][coszenith_index][ci],
-                                                                                                                       edges[year][flavor][coszenith_index][ci+1],
-                                                                                                                       edges[year][flavor][neutrino_energy_index][ei],
-                                                                                                                       edges[year][flavor][neutrino_energy_index][ei+1]);
-                        pion_event_expectation[year][ci][pi] += DOM_eff_correction*solid_angle*m2Tocm2*livetime[year]*areas[year][flavor][ei][ci][pi]*GetAveragedFlux(&nus_pion,flavor,
-                                                                                                                       edges[year][flavor][coszenith_index][ci],
-                                                                                                                       edges[year][flavor][coszenith_index][ci+1],
-                                                                                                                       edges[year][flavor][neutrino_energy_index][ei],
-                                                                                                                       edges[year][flavor][neutrino_energy_index][ei+1]);
-                    }
-                }
+    unsigned int indices[3],p,y;
+    for(PTypes flavor : {NUMU,NUMUBAR}){
+      for(unsigned int ei = 0; ei < neutrinoEnergyBins; ei++){
+        for(unsigned int ci = 0; ci < cosZenithBins; ci++){
+          double kaon_integrated_flux = GetAveragedFlux(&nus_kaon,flavor,
+                                                         edges[y2010][flavor][coszenith_index][ci],
+                                                         edges[y2010][flavor][coszenith_index][ci+1],
+                                                         edges[y2010][flavor][neutrino_energy_index][ei],
+                                                         edges[y2010][flavor][neutrino_energy_index][ei+1]);
+          double pion_integrated_flux = GetAveragedFlux(&nus_pion,flavor,
+                                                         edges[y2010][flavor][coszenith_index][ci],
+                                                         edges[y2010][flavor][coszenith_index][ci+1],
+                                                         edges[y2010][flavor][neutrino_energy_index][ei],
+                                                         edges[y2010][flavor][neutrino_energy_index][ei+1]);
+          for(unsigned int pi = 0; pi < energyProxyBins; pi++){
+            for(Year year : {y2010,y2011}){
+                indices[0]=ei;
+                indices[1]=ci;
+                indices[2]=pi;
+                p = (flavor == NUMU) ? 0 : 1;
+                y = (year == y2010) ? 0 : 1;
+                double solid_angle = 2.*PI_CONSTANT*(edges[year][flavor][coszenith_index][ci+1]-edges[year][flavor][coszenith_index][ci]);
+                double DOM_eff_correction = 1.; // this correction is flux dependent, we will need to fix this.
+                // double DOM_eff_correction =*index_multi(*convDOMEffCorrection[y],indices);
+                kaon_event_expectation[year][ci][pi] += DOM_eff_correction*solid_angle*m2Tocm2*livetime[year]*areas[year][flavor][ei][ci][pi]*kaon_integrated_flux;
+                pion_event_expectation[year][ci][pi] += DOM_eff_correction*solid_angle*m2Tocm2*livetime[year]*areas[year][flavor][ei][ci][pi]*pion_integrated_flux;
             }
+          }
         }
+      }
     }
 
     // to keep the code simple we are going to construct fake MC events
@@ -312,6 +323,8 @@ int main(int argc, char** argv)
     auto binner = [](HistType& h, const Event& e){
       h.add(e.energy_proxy,e.costh,e.year,amount(std::cref(e)));
     };
+
+    /*{ // old axis construction. There is a bug when using FixedUserDefinedAxis and the LLH class. Ticket sent to CW.
     // set up data histogram // note that the energy proxy and costh bins are the same for both years
     marray<double,1> zenith_bin_edges = edges[y2010][flavor][coszenith_index];
     marray<double,1> energy_proxy_bin_edges = edges[y2010][flavor][proxy_energy_index];
@@ -321,15 +334,36 @@ int main(int argc, char** argv)
     auto ep_ub_it = std::lower_bound(energy_proxy_bin_edges.begin(),energy_proxy_bin_edges.end(),maxFitEnergy);
     auto ep_lb_it = std::upper_bound(energy_proxy_bin_edges.begin(),energy_proxy_bin_edges.end(),minFitEnergy);
 
-    std::cout << *costh_ub_it << " " << *costh_lb_it << std::endl;
-    std::cout << *ep_ub_it << " " << *ep_lb_it << std::endl;
-
+    //std::cout << *costh_ub_it << " " << *costh_lb_it << std::endl;
+    //std::cout << *ep_ub_it << " " << *ep_lb_it << std::endl;
     HistType data_hist(FixedUserDefinedAxis(costh_lb_it,costh_ub_it),
                        FixedUserDefinedAxis(ep_lb_it,ep_ub_it),
                        LinearAxis(2010,1));
+    }*/
+
+    // this magic number set the right bin edges
+    HistType data_hist(LogarithmicAxis(0,0.1),LinearAxis(0,0.1),LinearAxis(2010,1));
+
+    data_hist.getAxis(0)->setLowerLimit(minFitEnergy);
+    data_hist.getAxis(0)->setUpperLimit(maxFitEnergy);
+    data_hist.getAxis(1)->setLowerLimit(minCosth);
+    data_hist.getAxis(1)->setUpperLimit(maxCosth);
 
     // fill in the histogram with the data
     bin(observed_events,data_hist,binner);
+
+    /*
+    { // print axis edges
+      std::cout << data_hist.range(0).first << " " << data_hist.range(0).second << std::endl;
+      for(unsigned int i = 0; i < data_hist.getBinCount(0); i++)
+        std::cout << data_hist.getBinEdge(0, i) << ' ';
+      std::cout << std::endl;
+      std::cout << data_hist.range(1).first << " " << data_hist.range(1).second << std::endl;
+      for(unsigned int i = 0; i < data_hist.getBinCount(1); i++)
+        std::cout << data_hist.getBinEdge(1, i) << ' ';
+      std::cout << std::endl;
+    }
+    */
 
     // create MC histogram with the same binning as the data
     HistType sim_hist = makeEmptyHistogramCopy(data_hist);
@@ -369,6 +403,10 @@ int main(int argc, char** argv)
     if(!quiet){
       std::cout << "Finding minima." << std::endl;
     }
+
+    //std::cout << "evalllh " << std::endl;
+    //std::cout << prob.evaluateLikelihood(seed) << std::endl;
+
     // minimize over the nuisance parameters
     fitResult fr = doFitLBFGSB(prob,seed,fixedIndices);
 

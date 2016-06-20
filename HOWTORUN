@@ -1,0 +1,2 @@
+do e.g.:
+./bin/calculate_llh.exe ../IC86OfficialRelease/effective_area_release/effective_area.h5 ../IC86OfficialRelease/simple_corrected_data_release.dat ./nusquids_fluxes/nusquids_pion_HondaGaisser.hdf5 ./nusquids_fluxes/nusquids_kaon_HondaGaisser.hdf5

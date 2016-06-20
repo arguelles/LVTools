@@ -46,7 +46,7 @@ int main()
   nus.Set_LV_CMatrix(c_parameters);
 
   // setup integration settings
-  nus.Set_h_max( 100.0*nus.units.km );
+  nus.Set_h_max( 100.0*units.km );
   nus.Set_PositivityConstrain(true);
   nus.Set_PositivityConstrainStep(300.0*units.km);
   nus.Set_rel_error(1.0e-25);
