@@ -13,6 +13,8 @@
 #include "likelihood.h"
 #include "event.h"
 #include "gsl_integrate_wrap.h"
+#include "LV_to_flavour_function.h"
+#include "chris_reads.h"
 
 using namespace nusquids;
 
@@ -51,7 +53,7 @@ fitResult doFitLBFGSB(LikelihoodType& likelihood, const std::vector<double>& see
   minimizer.setChangeTolerance(1e-5);
 
   minimizer.setHistorySize(20);
-  std::cout << seed[0] << " " << seed[1] << " " << seed[2] << std::endl;
+  //std::cout << seed[0] << " " << seed[1] << " " << seed[2] << std::endl;
 
   fitResult result;
   result.succeeded=minimizer.minimize(BFGS_Function<LikelihoodType>(likelihood));
@@ -70,7 +72,10 @@ void bin(const ContainerType& data, HistType& hist, const BinnerType& binner){
     binner(hist,event);
 }
 
-double GetAveragedFlux(nuSQUIDSAtm<nuSQUIDSLV> * nus,PTypes flavor, double costh, double enu_min, double enu_max) {
+const double integration_error = 1e-3;
+const unsigned int integration_iterations = 5000;
+
+double GetAveragedFlux(IntegrateWorkspace& ws, nuSQUIDSAtm<nuSQUIDSLV> * nus,PTypes flavor, double costh, double enu_min, double enu_max) {
     if(enu_min > enu_max)
       throw std::runtime_error("Min energy in the bin larger than large energy in the bin.");
     if (enu_min >= 1.0e6)
@@ -79,15 +84,29 @@ double GetAveragedFlux(nuSQUIDSAtm<nuSQUIDSLV> * nus,PTypes flavor, double costh
       return 0.;
     double GeV = 1.0e9;
     if (flavor == NUMU){
-        return integrate([&](double enu){return(nus->EvalFlavor(1,costh,enu*GeV,0));},enu_min,enu_max);
+        return integrate(ws, [&](double enu){return(nus->EvalFlavor(1,costh,enu*GeV,0));},enu_min,enu_max, integration_error, integration_iterations);
     } else {
-        return integrate([&](double enu){return(nus->EvalFlavor(1,costh,enu*GeV,1));},enu_min,enu_max);
+        return integrate(ws, [&](double enu){return(nus->EvalFlavor(1,costh,enu*GeV,1));},enu_min,enu_max, integration_error, integration_iterations);
     }
 }
 
-double GetAveragedFlux(nuSQUIDSAtm<nuSQUIDSLV> * nus,PTypes flavor, double costh_min, double costh_max, double enu_min, double enu_max) {
-  return (GetAveragedFlux(nus,flavor,costh_max,enu_min,enu_max) + GetAveragedFlux(nus,flavor,costh_min,enu_min,enu_max))/2.;
+double GetAveragedFlux(IntegrateWorkspace& ws, nuSQUIDSAtm<nuSQUIDSLV> * nus,PTypes flavor, double costh_min, double costh_max, double enu_min, double enu_max) {
+  return (GetAveragedFlux(ws, nus,flavor,costh_max,enu_min,enu_max) + GetAveragedFlux(ws, nus,flavor,costh_min,enu_min,enu_max))/2.;
   //return GetAveragedFlux(nus,flavor,(costh_max+costh_min)/2.,enu_min,enu_max);
+}
+
+double GetAvgPOsc(IntegrateWorkspace& ws, std::array<double, 2> params, PTypes flavor, double costh_min, double costh_max, double enu_min, double enu_max) {
+    if(enu_min > enu_max)
+      throw std::runtime_error("Min energy in the bin larger than large energy in the bin.");
+
+    const double earth_diameter = 2*6371; // km
+
+    double baseline_0 = -earth_diameter*costh_max, baseline_1 = -earth_diameter*costh_min ;
+    if (flavor == NUMU || flavor == NUMUBAR){
+        return integrate(ws, [&](double enu){return  LV::OscillationProbabilityTwoFlavorLV_intL(enu, baseline_0, baseline_1, params[0], params[1]); },enu_min,enu_max, integration_error, integration_iterations)/(baseline_1 - baseline_0)/(enu_max-enu_min);
+    } else {
+        throw std::logic_error("MNot implemented.");
+    }
 }
 
 //==================== NUISANCE PARAMETERS REWEIGHTERS =========================//
@@ -174,105 +193,86 @@ public:
 	}
 };
 
-//===================MAIN======================================================//
-//===================MAIN======================================================//
-//===================MAIN======================================================//
-//===================MAIN======================================================//
+
+//===================LLH function
 
 
-int main(int argc, char** argv)
-{
-    if(argc < 5){
-        std::cout << "Invalid number of arguments. The arguments should be given as follows: \n"
-                     "1) Path to the effective area hdf5.\n"
-                     "2) Path to the observed events file.\n"
-                     "3) Path to the kaon component nusquids calculated flux.\n"
-                     "4) Path to the pion component nusquids calculated flux.\n"
-                     "5) [optional] Path to output the event expectations.\n"
-                     << std::endl;
-        exit(1);
-    }
+const double PI_CONSTANT = 3.141592;
+const double m2Tocm2 = 1.0e4;
 
-    //============================== SETTINGS ===================================//
-    //============================== SETTINGS ===================================//
-    bool quiet = false;
-    size_t evalThreads=1;
-    std::vector<double> fitSeed {1.,0.,1.}; // normalization, deltaGamma, pi/K ratio
-    paramFixSpec fixedParams;
-    double minFitEnergy = 4.0e2;
+const unsigned int neutrino_energy_index = 0;
+const unsigned int coszenith_index = 1;
+const unsigned int proxy_energy_index = 2;
+const unsigned int neutrinoEnergyBins=280;
+const unsigned int cosZenithBins=11;
+const unsigned int energyProxyBins=50;
+const unsigned int number_of_years = 2;
+
+const double minFitEnergy = 4.0e2;
     //double maxFitEnergy = 2.0e4;
-    double maxFitEnergy = 1.8e4;
-    double minCosth = -1;
-    double maxCosth = 0.2;
+const double maxFitEnergy = 1.8e4;
+const double minCosth = -1;
+const double maxCosth = 0.2;
 
-    //============================== SETTINGS ===================================//
-    //============================== SETTINGS ===================================//
+const bool quiet = true;//false;
+const size_t evalThreads=1;
+const std::vector<double> fitSeed {1.,0.,1.}; // normalization, deltaGamma, pi/K ratio
 
-    // read nusquids calculated flux
-    if(!quiet){
-      std::cout << "Loading nuSQuIDS fluxes." << std::endl;
-    }
-    nuSQUIDSAtm<nuSQUIDSLV> nus_kaon((std::string(argv[3])));
-    nuSQUIDSAtm<nuSQUIDSLV> nus_pion((std::string(argv[4])));
+struct LLHWorkspace {
+  std::deque<Event>& observed_events;
 
-    //============================= begin read data  =============================//
-    if(!quiet){
-      std::cout << "Reading events from data file." << std::endl;
-    }
-    marray<double,2> observed_data = quickread(std::string(argv[2]));
-    std::deque<Event> observed_events;
-    for(unsigned int irow = 0; irow < observed_data.extent(0); irow++){
-      observed_events.push_back(Event(observed_data[irow][0],// energy proxy
-                                      observed_data[irow][1],// costh
-                                      static_cast<unsigned int>(observed_data[irow][2])));// year
-    }
-    //============================= end read data  =============================//
+  nusquids::marray<double,3>& kaon_event_expectation;
+  nusquids::marray<double,3>& pion_event_expectation;
+  IntegrateWorkspace& ws;
 
-    //============================= begin calculating event expectation  =============================//
-    if(!quiet){
-      std::cout << "Calculating event expectation using effective area." << std::endl;
-    }
-    const unsigned int neutrino_energy_index = 0;
-    const unsigned int coszenith_index = 1;
-    const unsigned int proxy_energy_index = 2;
-    AreaEdges edges;
-    AreaArray areas = get_areas(std::string(argv[1]), edges);
+  AreaEdges& edges;
+  AreaArray& areas;
+  std::array<double, 2>& livetime;
 
-    //std::cout << "Printing out the number of edges. Just a sanity check." << std::endl;
-    //std::cout << edges[y2010][NUMU][neutrino_energy_index].extent(0) << std::endl;
-    //std::cout << edges[y2010][NUMU][coszenith_index].extent(0) << std::endl;
-    //std::cout << edges[y2010][NUMU][proxy_energy_index].extent(0) << std::endl;
+  nuSQUIDSAtm<nuSQUIDSLV>* nus_kaon;
+  nuSQUIDSAtm<nuSQUIDSLV>* nus_pion;
 
-    const unsigned int neutrinoEnergyBins=280;
-    const unsigned int cosZenithBins=11;
-    const unsigned int energyProxyBins=50;
-    const unsigned int number_of_years = 2;
-    const double PI_CONSTANT = 3.141592;
-    const double m2Tocm2 = 1.0e4;
-    std::map<Year,double> livetime {{y2010,2.7282e+07},{y2011,2.96986e+07}}; // in seconds
+  multidim** convAtmosFlux;
+  multidim** convDOMEffCorrection;
+};
 
-    nusquids::marray<double,3> kaon_event_expectation{number_of_years,cosZenithBins,energyProxyBins};
+double llh(LLHWorkspace& ws, std::array<double, 2>& osc_params) {
+
+    nusquids::marray<double,3>& kaon_event_expectation = ws.kaon_event_expectation;
+    nusquids::marray<double,3>& pion_event_expectation = ws.pion_event_expectation;
+
     for(auto it = kaon_event_expectation.begin(); it < kaon_event_expectation.end(); it++)
         *it = 0.;
-
-    nusquids::marray<double,3> pion_event_expectation{number_of_years,cosZenithBins,energyProxyBins};
     for(auto it = pion_event_expectation.begin(); it < pion_event_expectation.end(); it++)
         *it = 0.;
 
     unsigned int indices[3],p,y;
+
+    #define USE_CHRIS_FLUX
+    #ifndef USE_CHRIS_FLUX
+    // read nusquids calculated flux
+    if(!quiet){
+      std::cout << "Loading nuSQuIDS fluxes." << std::endl;
+    }
+
     for(PTypes flavor : {NUMU,NUMUBAR}){
       for(unsigned int ei = 0; ei < neutrinoEnergyBins; ei++){
         for(unsigned int ci = 0; ci < cosZenithBins; ci++){
-          double kaon_integrated_flux = GetAveragedFlux(&nus_kaon,flavor,
-                                                         edges[y2010][flavor][coszenith_index][ci],
-                                                         edges[y2010][flavor][coszenith_index][ci+1],
-                                                         edges[y2010][flavor][neutrino_energy_index][ei],
-                                                         edges[y2010][flavor][neutrino_energy_index][ei+1]);
-          double pion_integrated_flux = GetAveragedFlux(&nus_pion,flavor,
-                                                         edges[y2010][flavor][coszenith_index][ci],
-                                                         edges[y2010][flavor][coszenith_index][ci+1],
-                                                         edges[y2010][flavor][neutrino_energy_index][ei],
-                                                         edges[y2010][flavor][neutrino_energy_index][ei+1]);
+          double p_osc = GetAvgPOsc(ws.ws, osc_params, flavor,
+                                                           ws.edges[y2010][flavor][coszenith_index][ci],
+                                                           ws.edges[y2010][flavor][coszenith_index][ci+1],
+                                                           ws.edges[y2010][flavor][neutrino_energy_index][ei],
+                                                           ws.edges[y2010][flavor][neutrino_energy_index][ei+1]);
+          double kaon_integrated_flux = GetAveragedFlux(ws.ws, &ws.nus_kaon,flavor,
+                                                         ws.edges[y2010][flavor][coszenith_index][ci],
+                                                         ws.edges[y2010][flavor][coszenith_index][ci+1],
+                                                         ws.edges[y2010][flavor][neutrino_energy_index][ei],
+                                                         ws.edges[y2010][flavor][neutrino_energy_index][ei+1]) * p_osc;
+          double pion_integrated_flux = GetAveragedFlux(ws.ws, &ws.nus_pion,flavor,
+                                                         ws.edges[y2010][flavor][coszenith_index][ci],
+                                                         ws.edges[y2010][flavor][coszenith_index][ci+1],
+                                                         ws.edges[y2010][flavor][neutrino_energy_index][ei],
+                                                         ws.edges[y2010][flavor][neutrino_energy_index][ei+1]) * p_osc;
           for(unsigned int pi = 0; pi < energyProxyBins; pi++){
             for(Year year : {y2010,y2011}){
                 indices[0]=ei;
@@ -280,16 +280,48 @@ int main(int argc, char** argv)
                 indices[2]=pi;
                 p = (flavor == NUMU) ? 0 : 1;
                 y = (year == y2010) ? 0 : 1;
-                double solid_angle = 2.*PI_CONSTANT*(edges[year][flavor][coszenith_index][ci+1]-edges[year][flavor][coszenith_index][ci]);
+                double solid_angle = 2.*PI_CONSTANT*(ws.edges[year][flavor][coszenith_index][ci+1]-ws.edges[year][flavor][coszenith_index][ci]);
                 double DOM_eff_correction = 1.; // this correction is flux dependent, we will need to fix this.
                 // double DOM_eff_correction =*index_multi(*convDOMEffCorrection[y],indices);
-                kaon_event_expectation[year][ci][pi] += DOM_eff_correction*solid_angle*m2Tocm2*livetime[year]*areas[year][flavor][ei][ci][pi]*kaon_integrated_flux;
-                pion_event_expectation[year][ci][pi] += DOM_eff_correction*solid_angle*m2Tocm2*livetime[year]*areas[year][flavor][ei][ci][pi]*pion_integrated_flux;
+                kaon_event_expectation[year][ci][pi] += DOM_eff_correction*solid_angle*m2Tocm2*ws.livetime[year]*ws.areas[year][flavor][ei][ci][pi]*kaon_integrated_flux;
+                pion_event_expectation[year][ci][pi] += DOM_eff_correction*solid_angle*m2Tocm2*ws.livetime[year]*ws.areas[year][flavor][ei][ci][pi]*pion_integrated_flux;
             }
           }
         }
       }
     }
+#else
+    
+        for(PTypes flavor : {NUMU,NUMUBAR}){
+            for(unsigned int ci = 0; ci < cosZenithBins; ci++){
+                for(unsigned int ei = 0; ei < neutrinoEnergyBins; ei++){
+                  double p_osc = GetAvgPOsc(ws.ws, osc_params, flavor,
+                                                           ws.edges[y2010][flavor][coszenith_index][ci],
+                                                           ws.edges[y2010][flavor][coszenith_index][ci+1],
+                                                           ws.edges[y2010][flavor][neutrino_energy_index][ei],
+                                                           ws.edges[y2010][flavor][neutrino_energy_index][ei+1]);
+
+                    for(unsigned int pi = 0; pi < energyProxyBins; pi++){
+                      for(Year year : {y2010,y2011}){
+                        //std::cout << ci << " " << edges[year][flavor][coszenith_index][ci] << std::endl;
+                        indices[0]=ei;
+                        indices[1]=ci;
+                        indices[2]=pi;
+                        p = (flavor == NUMU) ? 0 : 1;
+                        y = (year == y2010) ? 0 : 1;
+                        double fluxIntegral=*index_multi(*ws.convAtmosFlux[p],indices);
+                        double DOM_eff_correction =*index_multi(*ws.convDOMEffCorrection[y],indices);
+                        // chris does not separate between pions and kaon components. Lets just drop it all in the kaons.
+                        // also chris has already included the solid angle factor in the flux
+                        kaon_event_expectation[year][ci][pi] += m2Tocm2*ws.livetime[year]*ws.areas[year][flavor][ei][ci][pi]*DOM_eff_correction*fluxIntegral * p_osc;
+                        if (kaon_event_expectation[year][ci][pi] < 0) throw std::runtime_error("badness");
+                        
+                      }
+                  }
+              }
+          }
+      }
+#endif
 
     // to keep the code simple we are going to construct fake MC events
     // which weights are just the expectation value. The advantage of this is that
@@ -301,11 +333,11 @@ int main(int argc, char** argv)
       for(unsigned int ci = 0; ci < cosZenithBins; ci++){
         for(unsigned int pi = 0; pi < energyProxyBins; pi++){
           // we are going to save the bin content and label it at the bin center
-          mc_events.push_back(Event((edges[year][flavor][proxy_energy_index][pi]+edges[year][flavor][proxy_energy_index][pi+1])/2., // energy proxy bin center
-                                    (edges[year][flavor][coszenith_index][ci]+edges[year][flavor][coszenith_index][ci+1])/2., // costh bin center
+          mc_events.push_back(Event((ws.edges[year][flavor][proxy_energy_index][pi]+ws.edges[year][flavor][proxy_energy_index][pi+1])/2., // energy proxy bin center
+                                    (ws.edges[year][flavor][coszenith_index][ci]+ws.edges[year][flavor][coszenith_index][ci+1])/2., // costh bin center
                                     year == y2010 ? 2010 : 2011, // year
-                                    kaon_event_expectation[year][ci][pi], // amount of kaon component events
-                                    pion_event_expectation[year][ci][pi])); // amount of pion component events
+                                    ws.kaon_event_expectation[year][ci][pi], // amount of kaon component events
+                                    ws.pion_event_expectation[year][ci][pi])); // amount of pion component events
         }
       }
     }
@@ -350,7 +382,7 @@ int main(int argc, char** argv)
     data_hist.getAxis(1)->setUpperLimit(maxCosth);
 
     // fill in the histogram with the data
-    bin(observed_events,data_hist,binner);
+    bin(ws.observed_events,data_hist,binner);
 
     /*
     { // print axis edges
@@ -370,6 +402,7 @@ int main(int argc, char** argv)
     // fill in the histogram with the mc events
     bin(mc_events,sim_hist,binner);
 
+
     //============================= end making histograms  =============================//
 
     //============================= likelihood problem begins  =============================//
@@ -379,7 +412,7 @@ int main(int argc, char** argv)
     }
 
     likelihood::UniformPrior positivePrior(0.0,std::numeric_limits<double>::infinity());
-    likelihood::GaussianPrior normalizationPrior(1.,0.4);
+    likelihood::GaussianPrior normalizationPrior(1.,0.4);//0.4
     likelihood::GaussianPrior crSlopePrior(0.0,0.05);
     likelihood::GaussianPrior kaonPrior(1.0,0.1);
 
@@ -393,7 +426,8 @@ int main(int argc, char** argv)
     prob.setEvaluationThreadCount(evalThreads);
 
     std::vector<double> seed=prob.getSeed();
-    std::vector<unsigned int> fixedIndices;
+    std::vector<unsigned int> fixedIndices = {2};
+    paramFixSpec fixedParams;
     for(const auto pf : fixedParams.params){
       if(!quiet)
         std::cout << "Fitting with parameter " << pf.first << " fixed to " << pf.second << std::endl;
@@ -412,9 +446,127 @@ int main(int argc, char** argv)
 
     if(!quiet)
       std::cout << "Fitted Hypothesis: ";
-    for(unsigned int i=0; i<fr.params.size(); i++)
+    /*for(unsigned int i=0; i<fr.params.size(); i++)
       std::cout << fr.params[i] << ' ';
-    std::cout << std::setprecision(10) << fr.likelihood << std::setprecision(6) << ' ' << (fr.succeeded?"succeeded":"failed") << std::endl;
+    std::cout << std::setprecision(10) << fr.likelihood << std::setprecision(6) << ' ' << (fr.succeeded?"succeeded":"failed") << std::endl;*/
+    return fr.likelihood;//fr.params[2];//
+}
+
+//===================MAIN======================================================//
+//===================MAIN======================================================//
+//===================MAIN======================================================//
+//===================MAIN======================================================//
+
+
+int main(int argc, char** argv)
+{
+    if(argc < 5){
+        std::cout << "Invalid number of arguments. The arguments should be given as follows: \n"
+                     "1) Path to the effective area hdf5.\n"
+                     "2) Path to the observed events file.\n"
+                     "3) Path to the kaon component nusquids calculated flux.\n"
+                     "4) Path to the pion component nusquids calculated flux.\n"
+                     "5) [optional] Path to output the event expectations.\n"
+                     << std::endl;
+        exit(1);
+    }
+
+    //============================== SETTINGS ===================================//
+    //============================== SETTINGS ===================================//
+
+
+    //============================== SETTINGS ===================================//
+    //============================== SETTINGS ===================================//
+
+    //============================= begin read data  =============================//
+    if(!quiet){
+      std::cout << "Reading events from data file." << std::endl;
+    }
+    marray<double,2> observed_data = quickread(std::string(argv[2]));
+    std::deque<Event> observed_events;
+    for(unsigned int irow = 0; irow < observed_data.extent(0); irow++){
+      observed_events.push_back(Event(observed_data[irow][0],// energy proxy
+                                      observed_data[irow][1],// costh
+                                      static_cast<unsigned int>(observed_data[irow][2])));// year
+    }
+    //============================= end read data  =============================//
+
+    //============================= begin calculating event expectation  =============================//
+    if(!quiet){
+      std::cout << "Calculating event expectation using effective area." << std::endl;
+    }
+
+    AreaEdges edges;
+    AreaArray areas = get_areas(std::string(argv[1]), edges);
+
+    //std::cout << "Printing out the number of edges. Just a sanity check." << std::endl;
+    //std::cout << edges[y2010][NUMU][neutrino_energy_index].extent(0) << std::endl;
+    //std::cout << edges[y2010][NUMU][coszenith_index].extent(0) << std::endl;
+    //std::cout << edges[y2010][NUMU][proxy_energy_index].extent(0) << std::endl;
+    std::array<double, 2> livetime;
+    livetime[y2010] = 2.7282e+07; // in seconds
+    livetime[y2011] = 2.96986e+07; // in seconds
+
+    nusquids::marray<double,3> kaon_event_expectation{number_of_years,cosZenithBins,energyProxyBins};
+
+    nusquids::marray<double,3> pion_event_expectation{number_of_years,cosZenithBins,energyProxyBins};
+
+    std::array<double, 2> osc_params = {1e-25, 1e-25};
+
+    IntegrateWorkspace ws(5000);
+
+    LLHWorkspace llh_ws = {observed_events, kaon_event_expectation, pion_event_expectation, ws, edges, areas, livetime, nullptr, nullptr, nullptr, nullptr};
+
+#ifndef USE_CHRIS_FLUX
+    nuSQUIDSAtm<nuSQUIDSLV> nus_kaon((std::string(argv[3])));
+    nuSQUIDSAtm<nuSQUIDSLV> nus_pion((std::string(argv[4])));
+    llh_ws.nus_kaon = &nus_kaon;
+    llh_ws.nus_pion = &nus_pion;
+#else
+    //these share the same binning in the first two dimensions
+    const unsigned int histogramDims[3]={neutrinoEnergyBins,cosZenithBins,energyProxyBins};
+    multidim convDOMEffCorrection2010=alloc_multi(3,histogramDims);
+    multidim convDOMEffCorrection2011=alloc_multi(3,histogramDims);
+    multidim* convDOMEffCorrection[2]={&convDOMEffCorrection2010,&convDOMEffCorrection2011};
+
+    hid_t file_id = H5Fopen(argv[3], H5F_ACC_RDONLY, H5P_DEFAULT);
+    readDataSet(file_id, "/detector_correction/2010", convDOMEffCorrection2010.data);
+    readDataSet(file_id, "/detector_correction/2011", convDOMEffCorrection2011.data);
+
+    multidim convAtmosNuMu=alloc_multi(2,histogramDims);
+    multidim convAtmosNuMuBar=alloc_multi(2,histogramDims);
+    multidim* convAtmosFlux[2]={&convAtmosNuMu,&convAtmosNuMuBar};
+
+    readDataSet(file_id, "/nu_mu/integrated_flux", convAtmosNuMu.data);
+    readDataSet(file_id, "/nu_mu_bar/integrated_flux", convAtmosNuMuBar.data);
+
+    H5Fclose(file_id);
+
+    llh_ws.convDOMEffCorrection = convDOMEffCorrection;
+    llh_ws.convAtmosFlux = convAtmosFlux;
+#endif
+
+//#######################
+
+    double llh_val[1][100] = {0};
+    for (int i = 0; i < 1; i++) {
+      for (int j = 0; j < 100; j++) {
+        osc_params[0] =  std::pow(10, -28 + 6.0*i/100.0);
+        osc_params[1] =  std::pow(10, -28 + 6.0*j/100.0);
+        llh_val[i][j] = llh(llh_ws, osc_params);
+        //std::cout << llh_val[i][j] << std::endl;
+      } 
+    }
+    //std::cout << llh_val << std::endl;
+
+    if (argc > 5) {
+      std::string output_file_str=std::string(argv[5]);
+
+      std::ofstream output_file(output_file_str, std::ios::out | std::ios::binary);
+      output_file.write((char*)llh_val, sizeof(llh_val));
+      output_file.close();
+
+    }
 
     //============================= likelihood problem ends =============================//
 
@@ -422,7 +574,7 @@ int main(int argc, char** argv)
       std::cout << "Saving expectation." << std::endl;
     }
 
-    std::string output_file_str;;
+    /*std::string output_file_str;;
     if(argc > 5)
       output_file_str=std::string(argv[5]);
     else
@@ -433,7 +585,7 @@ int main(int argc, char** argv)
     for(auto event : mc_events){
       output_file << event.energy_proxy << " " << event.costh << " " << event.year << " " << weighter(event) << std::endl;
     }
-    output_file.close();
+    output_file.close();*/
 
     return 0;
 }
