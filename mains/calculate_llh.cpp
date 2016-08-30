@@ -109,6 +109,37 @@ double GetAvgPOsc(IntegrateWorkspace& ws, std::array<double, 2> params, PTypes f
     }
 }
 
+double GetAveragedFluxAstro(IntegrateWorkspace& ws,PTypes flavor, double costh, double enu_min, double enu_max) {
+    if(enu_min > enu_max)
+      throw std::runtime_error("Min energy in the bin larger than large energy in the bin.");
+    if (enu_min >= 1.0e6)
+      return 0.;
+    if (enu_max <= 1.0e2)
+      return 0.;
+    double GeV = 1.0e9;
+    if (flavor == NUMU){
+        return integrate(ws, [&](double enu){return(nus->EvalFlavor(1,costh,enu*GeV,0));},enu_min,enu_max, integration_error, integration_iterations);
+    } else {
+        return integrate(ws, [&](double enu){return(nus->EvalFlavor(1,costh,enu*GeV,1));},enu_min,enu_max, integration_error, integration_iterations);
+    }
+}
+
+double GetAveragedFluxAstro(IntegrateWorkspace& ws,PTypes flavor, double costh_min, double costh_max, double enu_min, double enu_max) {
+  return (GetAveragedFluxAstro(ws,flavor,costh_max,enu_min,enu_max) + GetAveragedFluxAstro(ws,flavor,costh_min,enu_min,enu_max))/2.;
+  //return GetAveragedFlux(nus,flavor,(costh_max+costh_min)/2.,enu_min,enu_max);
+}
+
+double GetAvgPOscAstro(IntegrateWorkspace& ws, std::array<double, 2> params, PTypes flavor, double costh_min, double costh_max, double enu_min, double enu_max) {
+    if(enu_min > enu_max)
+      throw std::runtime_error("Min energy in the bin larger than large energy in the bin.");
+
+    if (flavor == NUMU || flavor == NUMUBAR){
+        return integrate(ws, [&](double enu){return  LV::OscillationProbabilityTwoFlavorLV_Astro(enu, params[0], params[1]); },enu_min,enu_max, integration_error, integration_iterations)/(enu_max-enu_min);
+    } else {
+        throw std::logic_error("MNot implemented.");
+    }
+}
+
 //==================== NUISANCE PARAMETERS REWEIGHTERS =========================//
 //==================== NUISANCE PARAMETERS REWEIGHTERS =========================//
 
@@ -240,10 +271,13 @@ double llh(LLHWorkspace& ws, std::array<double, 2>& osc_params) {
 
     nusquids::marray<double,3>& kaon_event_expectation = ws.kaon_event_expectation;
     nusquids::marray<double,3>& pion_event_expectation = ws.pion_event_expectation;
+    nusquids::marray<double,3>&astro_event_expectation = ws.astro_event_expectation;
 
     for(auto it = kaon_event_expectation.begin(); it < kaon_event_expectation.end(); it++)
         *it = 0.;
     for(auto it = pion_event_expectation.begin(); it < pion_event_expectation.end(); it++)
+        *it = 0.;
+    for(auto it =astro_event_expectation.begin(); it <astro_event_expectation.end(); it++)
         *it = 0.;
 
     unsigned int indices[3],p,y;
@@ -273,6 +307,18 @@ double llh(LLHWorkspace& ws, std::array<double, 2>& osc_params) {
                                                          ws.edges[y2010][flavor][coszenith_index][ci+1],
                                                          ws.edges[y2010][flavor][neutrino_energy_index][ei],
                                                          ws.edges[y2010][flavor][neutrino_energy_index][ei+1]) * p_osc;
+
+	  double p_osca = GetAvgPOscAstro(ws.ws, osc_params, flavor,
+                                                           ws.edges[y2010][flavor][coszenith_index][ci],
+                                                           ws.edges[y2010][flavor][coszenith_index][ci+1],
+                                                           ws.edges[y2010][flavor][neutrino_energy_index][ei],
+                                                           ws.edges[y2010][flavor][neutrino_energy_index][ei+1]);
+         double astro_integrated_flux = GetAveragedFluxAstro(ws.ws,flavor,
+                                                         ws.edges[y2010][flavor][coszenith_index][ci],
+                                                         ws.edges[y2010][flavor][coszenith_index][ci+1],
+                                                         ws.edges[y2010][flavor][neutrino_energy_index][ei],
+                                                         ws.edges[y2010][flavor][neutrino_energy_index][ei+1]) * p_osca;
+	
           for(unsigned int pi = 0; pi < energyProxyBins; pi++){
             for(Year year : {y2010,y2011}){
                 indices[0]=ei;
@@ -285,6 +331,7 @@ double llh(LLHWorkspace& ws, std::array<double, 2>& osc_params) {
                 // double DOM_eff_correction =*index_multi(*convDOMEffCorrection[y],indices);
                 kaon_event_expectation[year][ci][pi] += DOM_eff_correction*solid_angle*m2Tocm2*ws.livetime[year]*ws.areas[year][flavor][ei][ci][pi]*kaon_integrated_flux;
                 pion_event_expectation[year][ci][pi] += DOM_eff_correction*solid_angle*m2Tocm2*ws.livetime[year]*ws.areas[year][flavor][ei][ci][pi]*pion_integrated_flux;
+	       astro_event_expectation[year][ci][pi] += DOM_eff_correction*solid_angle*m2Tocm2*ws.livetime[year]*ws.areas[year][flavor][ei][ci][pi]*astro_integrated_flux;
             }
           }
         }
