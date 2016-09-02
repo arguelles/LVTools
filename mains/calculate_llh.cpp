@@ -109,27 +109,25 @@ double GetAvgPOsc(IntegrateWorkspace& ws, std::array<double, 2> params, PTypes f
     }
 }
 
-double GetAveragedFluxAstro(IntegrateWorkspace& ws,PTypes flavor, double costh, double enu_min, double enu_max) {
+double GetAveragedAstroFlux(IntegrateWorkspace& ws, PTypes flavor, double costh, double enu_min, double enu_max) {
     if(enu_min > enu_max)
       throw std::runtime_error("Min energy in the bin larger than large energy in the bin.");
     if (enu_min >= 1.0e6)
       return 0.;
     if (enu_max <= 1.0e2)
       return 0.;
-    double GeV = 1.0e9;
-    if (flavor == NUMU){
-        return integrate(ws, [&](double enu){return(nus->EvalFlavor(1,costh,enu*GeV,0));},enu_min,enu_max, integration_error, integration_iterations);
-    } else {
-        return integrate(ws, [&](double enu){return(nus->EvalFlavor(1,costh,enu*GeV,1));},enu_min,enu_max, integration_error, integration_iterations);
-    }
+    
+    if(gamma != -1)
+      return N0*(pow(enu_max,gamma+1)-pow(enu_min,gamma+1))/(gamma+1);
+    else
+      return N0*(ln(enu_max)-ln(enu_min));
 }
 
-double GetAveragedFluxAstro(IntegrateWorkspace& ws,PTypes flavor, double costh_min, double costh_max, double enu_min, double enu_max) {
-  return (GetAveragedFluxAstro(ws,flavor,costh_max,enu_min,enu_max) + GetAveragedFluxAstro(ws,flavor,costh_min,enu_min,enu_max))/2.;
-  //return GetAveragedFlux(nus,flavor,(costh_max+costh_min)/2.,enu_min,enu_max);
+double GetAveragedAstroFlux(IntegrateWorkspace& ws, PTypes flavor, double costh_min, double costh_max, double enu_min, double enu_max) {
+  return (GetAveragedAstroFlux(ws,flavor,costh_max,enu_min,enu_max) + GetAveragedAstroFlux(ws,flavor,costh_min,enu_min,enu_max))/2.;
 }
 
-double GetAvgPOscAstro(IntegrateWorkspace& ws, std::array<double, 2> params, PTypes flavor, double costh_min, double costh_max, double enu_min, double enu_max) {
+double GetAvgAstroPOsc(IntegrateWorkspace& ws, std::array<double, 2> params, PTypes flavor, double costh_min, double costh_max, double enu_min, double enu_max) {
     if(enu_min > enu_max)
       throw std::runtime_error("Min energy in the bin larger than large energy in the bin.");
 
@@ -139,6 +137,8 @@ double GetAvgPOscAstro(IntegrateWorkspace& ws, std::array<double, 2> params, PTy
         throw std::logic_error("MNot implemented.");
     }
 }
+
+
 
 //==================== NUISANCE PARAMETERS REWEIGHTERS =========================//
 //==================== NUISANCE PARAMETERS REWEIGHTERS =========================//
@@ -254,6 +254,8 @@ struct LLHWorkspace {
 
   nusquids::marray<double,3>& kaon_event_expectation;
   nusquids::marray<double,3>& pion_event_expectation;
+  nusquids::marray<double,3>&astro_event_expectation;
+
   IntegrateWorkspace& ws;
 
   AreaEdges& edges;
@@ -267,11 +269,12 @@ struct LLHWorkspace {
   multidim** convDOMEffCorrection;
 };
 
+//not sure 2 --> 3
 double llh(LLHWorkspace& ws, std::array<double, 2>& osc_params) {
 
     nusquids::marray<double,3>& kaon_event_expectation = ws.kaon_event_expectation;
     nusquids::marray<double,3>& pion_event_expectation = ws.pion_event_expectation;
-    nusquids::marray<double,3>&astro_event_expectation = ws.astro_event_expectation;
+    nusquids::marray<double,3>&astro_event_expectation =ws.astro_event_expectation;
 
     for(auto it = kaon_event_expectation.begin(); it < kaon_event_expectation.end(); it++)
         *it = 0.;
@@ -307,18 +310,17 @@ double llh(LLHWorkspace& ws, std::array<double, 2>& osc_params) {
                                                          ws.edges[y2010][flavor][coszenith_index][ci+1],
                                                          ws.edges[y2010][flavor][neutrino_energy_index][ei],
                                                          ws.edges[y2010][flavor][neutrino_energy_index][ei+1]) * p_osc;
-
-	  double p_osca = GetAvgPOscAstro(ws.ws, osc_params, flavor,
+	  
+          double p_osc_astro = GetAvgAstroPOsc(ws.ws, osc_params, flavor,
                                                            ws.edges[y2010][flavor][coszenith_index][ci],
                                                            ws.edges[y2010][flavor][coszenith_index][ci+1],
                                                            ws.edges[y2010][flavor][neutrino_energy_index][ei],
-                                                           ws.edges[y2010][flavor][neutrino_energy_index][ei+1]);
-         double astro_integrated_flux = GetAveragedFluxAstro(ws.ws,flavor,
+                                                           ws.edges[y2010][flavor][neutrino_energy_index][ei+1]);	  
+          double astro_integrated_flux = GetAveragedAstroFlux(ws.ws,flavor,
                                                          ws.edges[y2010][flavor][coszenith_index][ci],
                                                          ws.edges[y2010][flavor][coszenith_index][ci+1],
                                                          ws.edges[y2010][flavor][neutrino_energy_index][ei],
-                                                         ws.edges[y2010][flavor][neutrino_energy_index][ei+1]) * p_osca;
-	
+                                                         ws.edges[y2010][flavor][neutrino_energy_index][ei+1]) * p_osc_astro;	  
           for(unsigned int pi = 0; pi < energyProxyBins; pi++){
             for(Year year : {y2010,y2011}){
                 indices[0]=ei;
@@ -383,8 +385,9 @@ double llh(LLHWorkspace& ws, std::array<double, 2>& osc_params) {
           mc_events.push_back(Event((ws.edges[year][flavor][proxy_energy_index][pi]+ws.edges[year][flavor][proxy_energy_index][pi+1])/2., // energy proxy bin center
                                     (ws.edges[year][flavor][coszenith_index][ci]+ws.edges[year][flavor][coszenith_index][ci+1])/2., // costh bin center
                                     year == y2010 ? 2010 : 2011, // year
-                                    ws.kaon_event_expectation[year][ci][pi], // amount of kaon component events
-                                    ws.pion_event_expectation[year][ci][pi])); // amount of pion component events
+                                    ws.kaon_event_expectation[year][ci][pi],  // amount of kaon component events
+                                    ws.pion_event_expectation[year][ci][pi],  // amount of pion component events
+	                           ws.astro_event_expectation[year][ci][pi]));// amount of pion component events
         }
       }
     }
@@ -461,15 +464,18 @@ double llh(LLHWorkspace& ws, std::array<double, 2>& osc_params) {
     likelihood::UniformPrior positivePrior(0.0,std::numeric_limits<double>::infinity());
     likelihood::GaussianPrior normalizationPrior(1.,0.4);//0.4
     likelihood::GaussianPrior crSlopePrior(0.0,0.05);
-    likelihood::GaussianPrior kaonPrior(1.0,0.1);
+    //double N0min = 1.0e-9; double N0max = 1.0e-7;
+    likelihood::UniformPrior astro_norm(0.0,std::numeric_limits<double>::infinity());
+    likelihood::UniformPrior astro_gamma(-2.5,-1.5);
 
-    auto priors=makePriorSet(normalizationPrior,crSlopePrior,kaonPrior);
+    auto priors=makePriorSet(normalizationPrior,crSlopePrior,kaonPrior,astro_norm, astro_gamma);
     // construct a MC event reweighter
     DiffuseFitWeighterMaker DFWM;
     // construct likelihood problem
-    // there are two numbers here. The first number is the number of histogram dimension
-    // in this case 3. The second number is the number of nuisance parameters, also 3.
-    auto prob=likelihood::makeLikelihoodProblem<std::reference_wrapper<const Event>,3,3>(data_hist, {sim_hist}, priors, {1.0}, likelihood::simpleDataWeighter(), DFWM, likelihood::poissonLikelihood(), fitSeed);
+    // there are two numbers here. The first number is the number of histogram dimension, in this case 3.
+    // The second number is the number of nuisance parameters, it is 3 for conventional-only,
+    // and 5 for conventional+astro, and XX for conventional+astro+prompt.
+    auto prob=likelihood::makeLikelihoodProblem<std::reference_wrapper<const Event>,3,5>(data_hist, {sim_hist}, priors, {1.0}, likelihood::simpleDataWeighter(), DFWM, likelihood::poissonLikelihood(), fitSeed);
     prob.setEvaluationThreadCount(evalThreads);
 
     std::vector<double> seed=prob.getSeed();
@@ -555,14 +561,15 @@ int main(int argc, char** argv)
     livetime[y2011] = 2.96986e+07; // in seconds
 
     nusquids::marray<double,3> kaon_event_expectation{number_of_years,cosZenithBins,energyProxyBins};
-
     nusquids::marray<double,3> pion_event_expectation{number_of_years,cosZenithBins,energyProxyBins};
+    nusquids::marray<double,3>astro_event_expectation{number_of_years,cosZenithBins,energyProxyBins};
 
     std::array<double, 2> osc_params = {1e-25, 1e-25};
 
     IntegrateWorkspace ws(5000);
 
-    LLHWorkspace llh_ws = {observed_events, kaon_event_expectation, pion_event_expectation, ws, edges, areas, livetime, nullptr, nullptr, nullptr, nullptr};
+    //not sure astro_event fit here
+    LLHWorkspace llh_ws = {observed_events, kaon_event_expectation, pion_event_expectation, astro_event_expectation, ws, edges, areas, livetime, nullptr, nullptr, nullptr, nullptr};
 
 #ifndef USE_CHRIS_FLUX
     nuSQUIDSAtm<nuSQUIDSLV> nus_kaon((std::string(argv[3])));
