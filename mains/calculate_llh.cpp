@@ -548,8 +548,8 @@ int main(int argc, char** argv)
 
 //#######################
 
-    double llh_val[1][100] = {0};
-    for (int i = 0; i < 1; i++) {
+    double llh_val[100][100] = {0};
+    for (int i = 0; i < 100; i++) {
       for (int j = 0; j < 100; j++) {
         osc_params[0] =  std::pow(10, -28 + 6.0*i/100.0);
         osc_params[1] =  std::pow(10, -28 + 6.0*j/100.0);
