@@ -95,9 +95,9 @@ class nuSQUIDSLV: public nuSQUIDS {
     }
   public:
     nuSQUIDSLV() {};
-    nuSQUIDSLV(double Emin_,double Emax_,int Esize_,int numneu_,NeutrinoType NT_,
-         bool elogscale_,bool iinteraction_):
-          nuSQUIDS(Emin_,Emax_,Esize_,numneu_,NT_,elogscale_,iinteraction_)
+    nuSQUIDSLV(marray<double,1> E_range_,unsigned int numneu_,NeutrinoType NT_,
+         bool iinteraction_):
+          nuSQUIDS(E_range_,numneu_,NT_,iinteraction_)
     {
       // just allocate some matrices
        LVP_evol.resize(ne);
