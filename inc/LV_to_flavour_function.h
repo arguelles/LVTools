@@ -28,7 +28,7 @@
 
 namespace LV {
     // Teppeis' constants I have wrap into a namespace.
-    
+
     //global constant
     double xpi   = 3.1415927; //3.1415926535
     double x2pi  = 6.2831853; //2*3.1415926535
@@ -37,7 +37,7 @@ namespace LV {
     double xAv   =6.022E23;   //Avogadro
     double xR    =6378.140;   //km
     double xDEG= 0.01745329252;//deg to rad;
-    
+
     //neutrino constant
     double th13= 8.50*xDEG;
     double th23=42.30*xDEG;
@@ -48,7 +48,7 @@ namespace LV {
     //mass
     double dm12=7.50e-5*1.0E-18;//GeV2
     double dm32=2.45e-3*1.0E-18;//GeV2
-    
+
     // This is the function we will plug in
     double OscillationProbabilityTwoFlavorLV(double neutrino_energy /*GeV*/, double baseline, /*km*/
 					     double cmutau_real,double cmutau_imag,double cmumu){
@@ -70,29 +70,29 @@ namespace LV {
 	//double Rn=2.0*Dd*neutrino_energy*neutrino_energy/dm32;
         //double R=sqrt(1.0+Rn*Rn+2.0*Rn*a1);
         //double sin22T=1.0/R/R*(a2+Rn*Rn*a3+2.0*Rn*a0);
-	double Dd=sqrt(pow(cmumu,2.0)+pow(cmutau_real,2.0)+pow(cmutau_imag,2.0));
-	double c2x=cmumu/Dd;
-	double s2x=sqrt(pow(cmutau_real,2.0)+pow(cmutau_imag,2.0))/Dd;
-	double cet=cmutau_real/sqrt(pow(cmutau_real,2.0)+pow(cmutau_imag,2.0));
+        double Dd=sqrt(pow(cmumu,2.0)+pow(cmutau_real,2.0)+pow(cmutau_imag,2.0));
+        double c2x=cmumu/Dd;
+        double s2x=sqrt(pow(cmutau_real,2.0)+pow(cmutau_imag,2.0))/Dd;
+        double cet=cmutau_real/sqrt(pow(cmutau_real,2.0)+pow(cmutau_imag,2.0));
         double Rn=4.0*Dd*neutrino_energy*neutrino_energy/dm32;
         double R=sqrt(1.0+Rn*Rn+2.0*Rn*(c2t*c2x+s2t*s2x*cet));
         double sin22T=1.0/R/R*(s2t*s2t+Rn*Rn*s2x*s2x+2.0*Rn*s2t*s2x*cet);
         //Oscillation equation itself
         double Posc=1.0-sin22T*pow(sin(dm32*baseline*R/4.0/neutrino_energy/xhbarc),2.0);
-	
+
         return Posc;
     }
 
     // This is the function we will plug in
     double OscillationProbabilityTwoFlavorLV_intL(double neutrino_energy /*GeV*/, double baseline_0, double baseline_1, /*km*/
-						  double cmutau_real,double cmutau_imag,double cmutau_imag,double cmumu){
+        double cmutau_real,double cmutau_imag,double cmumu){
 
         using namespace std;
         //Oscillation equation parameters
-	double Dd=sqrt(pow(cmumu,2.0)+pow(cmutau_real,2.0)+pow(cmutau_imag,2.0));
-	double c2x=cmumu/Dd;
-	double s2x=sqrt(pow(cmutau_real,2.0)+pow(cmutau_imag,2.0))/Dd;
-	double cet=cmutau_real/sqrt(pow(cmutau_real,2.0)+pow(cmutau_imag,2.0));
+        double Dd=sqrt(pow(cmumu,2.0)+pow(cmutau_real,2.0)+pow(cmutau_imag,2.0));
+        double c2x=cmumu/Dd;
+        double s2x=sqrt(pow(cmutau_real,2.0)+pow(cmutau_imag,2.0))/Dd;
+        double cet=cmutau_real/sqrt(pow(cmutau_real,2.0)+pow(cmutau_imag,2.0));
         double Rn=4.0*Dd*neutrino_energy*neutrino_energy/dm32;
         double R=sqrt(1.0+Rn*Rn+2.0*Rn*(c2t*c2x+s2t*s2x*cet));
         double sin22T=1.0/R/R*(s2t*s2t+Rn*Rn*s2x*s2x+2.0*Rn*s2t*s2x*cet);
@@ -106,15 +106,15 @@ namespace LV {
         return Posc_L;
     }
 
-   double OscillationProbabilityTwoFlavorLV_Astro(double neutrino_energy /*GeV*/, 
-						  double cmutau_real,double cmutau_imag,double cmutau_imag,double cmumu){
+   double OscillationProbabilityTwoFlavorLV_Astro(double neutrino_energy /*GeV*/,
+       double cmutau_real,double cmutau_imag,double cmumu){
 
         using namespace std;
         //Oscillation equation parameters
-	double Dd=sqrt(pow(cmumu,2.0)+pow(cmutau_real,2.0)+pow(cmutau_imag,2.0));
-	double c2x=cmumu/Dd;
-	double s2x=sqrt(pow(cmutau_real,2.0)+pow(cmutau_imag,2.0))/Dd;
-	double cet=cmutau_real/sqrt(pow(cmutau_real,2.0)+pow(cmutau_imag,2.0));
+        double Dd=sqrt(pow(cmumu,2.0)+pow(cmutau_real,2.0)+pow(cmutau_imag,2.0));
+        double c2x=cmumu/Dd;
+        double s2x=sqrt(pow(cmutau_real,2.0)+pow(cmutau_imag,2.0))/Dd;
+        double cet=cmutau_real/sqrt(pow(cmutau_real,2.0)+pow(cmutau_imag,2.0));
         double Rn=4.0*Dd*neutrino_energy*neutrino_energy/dm32;
         double R=sqrt(1.0+Rn*Rn+2.0*Rn*(c2t*c2x+s2t*s2x*cet));
         double sin22T=1.0/R/R*(s2t*s2t+Rn*Rn*s2x*s2x+2.0*Rn*s2t*s2x*cet);
@@ -125,7 +125,7 @@ namespace LV {
 
         return Posc_Astro;
     }
-    
+
 } // end namespace
 
 #endif

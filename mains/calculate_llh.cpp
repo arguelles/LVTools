@@ -92,10 +92,9 @@ double GetAveragedFlux(IntegrateWorkspace& ws, nuSQUIDSAtm<nuSQUIDSLV> * nus,PTy
 
 double GetAveragedFlux(IntegrateWorkspace& ws, nuSQUIDSAtm<nuSQUIDSLV> * nus,PTypes flavor, double costh_min, double costh_max, double enu_min, double enu_max) {
   return (GetAveragedFlux(ws, nus,flavor,costh_max,enu_min,enu_max) + GetAveragedFlux(ws, nus,flavor,costh_min,enu_min,enu_max))/2.;
-  //return GetAveragedFlux(nus,flavor,(costh_max+costh_min)/2.,enu_min,enu_max);
 }
 
-double GetAvgPOsc(IntegrateWorkspace& ws, std::array<double, 2> params, PTypes flavor, double costh_min, double costh_max, double enu_min, double enu_max) {
+double GetAvgPOsc(IntegrateWorkspace& ws, std::array<double, 3> params, PTypes flavor, double costh_min, double costh_max, double enu_min, double enu_max) {
     if(enu_min > enu_max)
       throw std::runtime_error("Min energy in the bin larger than large energy in the bin.");
 
@@ -103,11 +102,14 @@ double GetAvgPOsc(IntegrateWorkspace& ws, std::array<double, 2> params, PTypes f
 
     double baseline_0 = -earth_diameter*costh_max, baseline_1 = -earth_diameter*costh_min ;
     if (flavor == NUMU || flavor == NUMUBAR){
-        return integrate(ws, [&](double enu){return  LV::OscillationProbabilityTwoFlavorLV_intL(enu, baseline_0, baseline_1, params[0], params[1]); },enu_min,enu_max, integration_error, integration_iterations)/(baseline_1 - baseline_0)/(enu_max-enu_min);
+        return integrate(ws, [&](double enu){return  LV::OscillationProbabilityTwoFlavorLV_intL(enu, baseline_0, baseline_1, params[0], params[1], params[2]); },enu_min,enu_max, integration_error, integration_iterations)/(baseline_1 - baseline_0)/(enu_max-enu_min);
     } else {
         throw std::logic_error("MNot implemented.");
     }
 }
+
+const int astro_gamma = -2;
+const double N0 = 9.9e-9; // GeV^-1 cm^-2 sr^-1 s^-1
 
 double GetAveragedAstroFlux(IntegrateWorkspace& ws, PTypes flavor, double costh, double enu_min, double enu_max) {
     if(enu_min > enu_max)
@@ -116,23 +118,23 @@ double GetAveragedAstroFlux(IntegrateWorkspace& ws, PTypes flavor, double costh,
       return 0.;
     if (enu_max <= 1.0e2)
       return 0.;
-    
-    if(gamma != -1)
-      return N0*(pow(enu_max,gamma+1)-pow(enu_min,gamma+1))/(gamma+1);
+
+    if(astro_gamma != -1)
+      return N0*(pow(enu_min,astro_gamma+1.)-pow(enu_max,astro_gamma+1.))/(astro_gamma+1.);
     else
-      return N0*(ln(enu_max)-ln(enu_min));
+      return N0*(log(enu_max)-log(enu_min));
 }
 
 double GetAveragedAstroFlux(IntegrateWorkspace& ws, PTypes flavor, double costh_min, double costh_max, double enu_min, double enu_max) {
   return (GetAveragedAstroFlux(ws,flavor,costh_max,enu_min,enu_max) + GetAveragedAstroFlux(ws,flavor,costh_min,enu_min,enu_max))/2.;
 }
 
-double GetAvgAstroPOsc(IntegrateWorkspace& ws, std::array<double, 2> params, PTypes flavor, double costh_min, double costh_max, double enu_min, double enu_max) {
+double GetAvgAstroPOsc(IntegrateWorkspace& ws, std::array<double, 3> params, PTypes flavor, double costh_min, double costh_max, double enu_min, double enu_max) {
     if(enu_min > enu_max)
       throw std::runtime_error("Min energy in the bin larger than large energy in the bin.");
 
     if (flavor == NUMU || flavor == NUMUBAR){
-        return integrate(ws, [&](double enu){return  LV::OscillationProbabilityTwoFlavorLV_Astro(enu, params[0], params[1]); },enu_min,enu_max, integration_error, integration_iterations)/(enu_max-enu_min);
+        return integrate(ws, [&](double enu){return  LV::OscillationProbabilityTwoFlavorLV_Astro(enu, params[0], params[1], params[2]); },enu_min,enu_max, integration_error, integration_iterations)/(enu_max-enu_min);
     } else {
         throw std::logic_error("MNot implemented.");
     }
@@ -151,7 +153,7 @@ private:
 public:
 	using result_type=T;
 	powerlawWeighter(T i):index(i){}
-	
+
 	template<typename Event>
 	result_type operator()(const Event& e) const{
 		return(pow((double)e.primaryEnergy,index));
@@ -169,7 +171,7 @@ public:
 	using result_type=T;
 	powerlawTiltWeighter(double me, T dg/*, typename Event::crTiltValues Event::* c*/):
 	medianEnergy(me),deltaIndex(dg)/*,cachedData(c)*/{}
-	
+
 	result_type operator()(const Event& e) const{
 		//const typename Event::crTiltValues& cache=e.*cachedData;
 		result_type weight=pow(e.energy_proxy/medianEnergy,-deltaIndex);
@@ -191,8 +193,9 @@ public:
 
 struct DiffuseFitWeighterMaker{
 private:
-	static constexpr double medianConvEnergy=2020;
-	//static constexpr double medianPromptEnergy=7887;
+	static constexpr double medianConvEnergy=2020; // GeV
+	//static constexpr double medianPromptEnergy=7887; // GeV
+	static constexpr double medianAstroEnergy=1.0e5; // GeV
 public:
 	DiffuseFitWeighterMaker()
 	{}
@@ -200,27 +203,33 @@ public:
 	template<typename DataType>
 	std::function<DataType(const Event&)> operator()(const std::vector<DataType>& params) const{
     // check that we are getting the right number of nuisance parameters
-		assert(params.size()==3);
+		assert(params.size()==5);
 		//unpack things so we have legible names
 		DataType convNorm=params[0];
 		DataType CRDeltaGamma=params[1];
 		DataType piKRatio=params[2];
+		DataType astroNorm=params[3];
+		DataType astroDeltaGamma=params[4];
 
 		using cachedWeighter=cachedValueWeighter<DataType,Event,double>;
 		cachedWeighter convPionFlux(&Event::conv_pion_event); // we get the pion component
 		cachedWeighter convKaonFlux(&Event::conv_kaon_event); // we get the kaon component
+		cachedWeighter astroFlux(&Event::astro_event); // we get the pion component
 
 		auto conventionalComponent = convNorm*(convPionFlux + piKRatio*convKaonFlux)
 		                             *powerlawTiltWeighter<Event,DataType>(medianConvEnergy, CRDeltaGamma); // we sum them upp according to some pi/k ratio.
 
+		auto astroComponent = astroNorm*(astroFlux)
+		                             *powerlawTiltWeighter<Event,DataType>(medianAstroEnergy, astroDeltaGamma); // constructing the astrophysical component with a tilt
+
     /*
-     * We will deal with the prompt and astrophysical components later. CA
+     * We will deal with the prompt component later. CA
 		auto promptComponent = promptNorm*promptFlux
 		                       *powerlawTiltWeighter<Event,DataType>(medianPromptEnergy, CRDeltaGamma);
 
     */
 
-		return (conventionalComponent);
+		return (conventionalComponent + astroComponent);
 	}
 };
 
@@ -247,7 +256,7 @@ const double maxCosth = 0.2;
 
 const bool quiet = true;//false;
 const size_t evalThreads=1;
-const std::vector<double> fitSeed {1.,0.,1.}; // normalization, deltaGamma, pi/K ratio
+const std::vector<double> fitSeed {1.,0.,1.,1.,0.}; // normalization, deltaGamma, pi/K ratio
 
 struct LLHWorkspace {
   std::deque<Event>& observed_events;
@@ -270,7 +279,7 @@ struct LLHWorkspace {
 };
 
 //not sure 2 --> 3
-double llh(LLHWorkspace& ws, std::array<double, 2>& osc_params) {
+double llh(LLHWorkspace& ws, std::array<double, 3>& osc_params) {
 
     nusquids::marray<double,3>& kaon_event_expectation = ws.kaon_event_expectation;
     nusquids::marray<double,3>& pion_event_expectation = ws.pion_event_expectation;
@@ -310,17 +319,17 @@ double llh(LLHWorkspace& ws, std::array<double, 2>& osc_params) {
                                                          ws.edges[y2010][flavor][coszenith_index][ci+1],
                                                          ws.edges[y2010][flavor][neutrino_energy_index][ei],
                                                          ws.edges[y2010][flavor][neutrino_energy_index][ei+1]) * p_osc;
-	  
+
           double p_osc_astro = GetAvgAstroPOsc(ws.ws, osc_params, flavor,
                                                            ws.edges[y2010][flavor][coszenith_index][ci],
                                                            ws.edges[y2010][flavor][coszenith_index][ci+1],
                                                            ws.edges[y2010][flavor][neutrino_energy_index][ei],
-                                                           ws.edges[y2010][flavor][neutrino_energy_index][ei+1]);	  
+                                                           ws.edges[y2010][flavor][neutrino_energy_index][ei+1]);
           double astro_integrated_flux = GetAveragedAstroFlux(ws.ws,flavor,
                                                          ws.edges[y2010][flavor][coszenith_index][ci],
                                                          ws.edges[y2010][flavor][coszenith_index][ci+1],
                                                          ws.edges[y2010][flavor][neutrino_energy_index][ei],
-                                                         ws.edges[y2010][flavor][neutrino_energy_index][ei+1]) * p_osc_astro;	  
+                                                         ws.edges[y2010][flavor][neutrino_energy_index][ei+1]) * p_osc_astro;
           for(unsigned int pi = 0; pi < energyProxyBins; pi++){
             for(Year year : {y2010,y2011}){
                 indices[0]=ei;
@@ -333,14 +342,13 @@ double llh(LLHWorkspace& ws, std::array<double, 2>& osc_params) {
                 // double DOM_eff_correction =*index_multi(*convDOMEffCorrection[y],indices);
                 kaon_event_expectation[year][ci][pi] += DOM_eff_correction*solid_angle*m2Tocm2*ws.livetime[year]*ws.areas[year][flavor][ei][ci][pi]*kaon_integrated_flux;
                 pion_event_expectation[year][ci][pi] += DOM_eff_correction*solid_angle*m2Tocm2*ws.livetime[year]*ws.areas[year][flavor][ei][ci][pi]*pion_integrated_flux;
-	       astro_event_expectation[year][ci][pi] += DOM_eff_correction*solid_angle*m2Tocm2*ws.livetime[year]*ws.areas[year][flavor][ei][ci][pi]*astro_integrated_flux;
+                astro_event_expectation[year][ci][pi] += DOM_eff_correction*solid_angle*m2Tocm2*ws.livetime[year]*ws.areas[year][flavor][ei][ci][pi]*astro_integrated_flux;
             }
           }
         }
       }
     }
 #else
-    
         for(PTypes flavor : {NUMU,NUMUBAR}){
             for(unsigned int ci = 0; ci < cosZenithBins; ci++){
                 for(unsigned int ei = 0; ei < neutrinoEnergyBins; ei++){
@@ -364,7 +372,6 @@ double llh(LLHWorkspace& ws, std::array<double, 2>& osc_params) {
                         // also chris has already included the solid angle factor in the flux
                         kaon_event_expectation[year][ci][pi] += m2Tocm2*ws.livetime[year]*ws.areas[year][flavor][ei][ci][pi]*DOM_eff_correction*fluxIntegral * p_osc;
                         if (kaon_event_expectation[year][ci][pi] < 0) throw std::runtime_error("badness");
-                        
                       }
                   }
               }
@@ -452,7 +459,6 @@ double llh(LLHWorkspace& ws, std::array<double, 2>& osc_params) {
     // fill in the histogram with the mc events
     bin(mc_events,sim_hist,binner);
 
-
     //============================= end making histograms  =============================//
 
     //============================= likelihood problem begins  =============================//
@@ -464,9 +470,10 @@ double llh(LLHWorkspace& ws, std::array<double, 2>& osc_params) {
     likelihood::UniformPrior positivePrior(0.0,std::numeric_limits<double>::infinity());
     likelihood::GaussianPrior normalizationPrior(1.,0.4);//0.4
     likelihood::GaussianPrior crSlopePrior(0.0,0.05);
+    likelihood::GaussianPrior kaonPrior(1.0,0.1);
     //double N0min = 1.0e-9; double N0max = 1.0e-7;
     likelihood::UniformPrior astro_norm(0.0,std::numeric_limits<double>::infinity());
-    likelihood::UniformPrior astro_gamma(-2.5,-1.5);
+    likelihood::UniformPrior astro_gamma(-0.5,0.5);
 
     auto priors=makePriorSet(normalizationPrior,crSlopePrior,kaonPrior,astro_norm, astro_gamma);
     // construct a MC event reweighter
@@ -564,7 +571,7 @@ int main(int argc, char** argv)
     nusquids::marray<double,3> pion_event_expectation{number_of_years,cosZenithBins,energyProxyBins};
     nusquids::marray<double,3>astro_event_expectation{number_of_years,cosZenithBins,energyProxyBins};
 
-    std::array<double, 2> osc_params = {1e-25, 1e-25};
+    std::array<double, 3> osc_params = {1e-25, 1e-25, 1e-25};
 
     IntegrateWorkspace ws(5000);
 
@@ -602,14 +609,17 @@ int main(int argc, char** argv)
 
 //#######################
 
-    double llh_val[100][100] = {0};
+    double llh_val[100][100][100] = {0};
     for (int i = 0; i < 100; i++) {
       for (int j = 0; j < 100; j++) {
-        osc_params[0] =  std::pow(10, -28 + 6.0*i/100.0);
-        osc_params[1] =  std::pow(10, -28 + 6.0*j/100.0);
-        llh_val[i][j] = llh(llh_ws, osc_params);
-        //std::cout << llh_val[i][j] << std::endl;
-      } 
+        for (int k = 0; k < 100; k++) {
+          osc_params[0] =  std::pow(10, -28 + 6.0*i/100.0);
+          osc_params[1] =  std::pow(10, -28 + 6.0*j/100.0);
+          osc_params[2] =  std::pow(10, -28 + 6.0*j/100.0);
+          llh_val[i][j][k] = llh(llh_ws, osc_params);
+          //std::cout << llh_val[i][j] << std::endl;
+        }
+      }
     }
     //std::cout << llh_val << std::endl;
 
