@@ -295,8 +295,8 @@ double llh(LLHWorkspace& ws, std::array<double, 3>& osc_params) {
 
     unsigned int indices[3],p,y;
 
-    #define USE_CHRIS_FLUX
-    #ifndef USE_CHRIS_FLUX
+#define USE_CHRIS_FLUX
+#ifndef USE_CHRIS_FLUX
     // read nusquids calculated flux
     if(!quiet){
       std::cout << "Loading nuSQuIDS fluxes." << std::endl;
@@ -358,6 +358,16 @@ double llh(LLHWorkspace& ws, std::array<double, 3>& osc_params) {
                                                            ws.edges[y2010][flavor][coszenith_index][ci+1],
                                                            ws.edges[y2010][flavor][neutrino_energy_index][ei],
                                                            ws.edges[y2010][flavor][neutrino_energy_index][ei+1]);
+                  double p_osc_astro = GetAvgAstroPOsc(ws.ws, osc_params, flavor,
+                                                                   ws.edges[y2010][flavor][coszenith_index][ci],
+                                                                   ws.edges[y2010][flavor][coszenith_index][ci+1],
+                                                                   ws.edges[y2010][flavor][neutrino_energy_index][ei],
+                                                                   ws.edges[y2010][flavor][neutrino_energy_index][ei+1]);
+                  double astro_integrated_flux = GetAveragedAstroFlux(ws.ws,flavor,
+                                                                 ws.edges[y2010][flavor][coszenith_index][ci],
+                                                                 ws.edges[y2010][flavor][coszenith_index][ci+1],
+                                                                 ws.edges[y2010][flavor][neutrino_energy_index][ei],
+                                                                 ws.edges[y2010][flavor][neutrino_energy_index][ei+1]) * p_osc_astro;
 
                     for(unsigned int pi = 0; pi < energyProxyBins; pi++){
                       for(Year year : {y2010,y2011}){
@@ -372,6 +382,7 @@ double llh(LLHWorkspace& ws, std::array<double, 3>& osc_params) {
                         // chris does not separate between pions and kaon components. Lets just drop it all in the kaons.
                         // also chris has already included the solid angle factor in the flux
                         kaon_event_expectation[year][ci][pi] += m2Tocm2*ws.livetime[year]*ws.areas[year][flavor][ei][ci][pi]*DOM_eff_correction*fluxIntegral * p_osc;
+                        astro_event_expectation[year][ci][pi] += DOM_eff_correction*solid_angle*m2Tocm2*ws.livetime[year]*ws.areas[year][flavor][ei][ci][pi]*astro_integrated_flux;
                         if (kaon_event_expectation[year][ci][pi] < 0) throw std::runtime_error("badness");
                       }
                   }
