@@ -406,7 +406,7 @@ double llh(LLHWorkspace& ws, std::array<double, 3>& osc_params) {
                                     year == y2010 ? 2010 : 2011, // year
                                     ws.kaon_event_expectation[year][ci][pi],  // amount of kaon component events
                                     ws.pion_event_expectation[year][ci][pi],  // amount of pion component events
-	                           ws.astro_event_expectation[year][ci][pi]));// amount of pion component events
+	                                  ws.astro_event_expectation[year][ci][pi]));// amount of astrophysical component events
         }
       }
     }
