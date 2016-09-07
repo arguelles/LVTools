@@ -126,7 +126,8 @@ double GetAveragedAstroFlux(IntegrateWorkspace& ws, PTypes flavor, double costh,
 }
 
 double GetAveragedAstroFlux(IntegrateWorkspace& ws, PTypes flavor, double costh_min, double costh_max, double enu_min, double enu_max) {
-  return (GetAveragedAstroFlux(ws,flavor,costh_max,enu_min,enu_max) + GetAveragedAstroFlux(ws,flavor,costh_min,enu_min,enu_max))/2.;
+  // the astrophical flux is independent of cos(th)
+  return GetAveragedAstroFlux(ws,flavor,costh_max,enu_min,enu_max);
 }
 
 double GetAvgAstroPOsc(IntegrateWorkspace& ws, std::array<double, 3> params, PTypes flavor, double costh_min, double costh_max, double enu_min, double enu_max) {
