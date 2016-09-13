@@ -15,7 +15,7 @@ int main()
   // setting up nusquids object
   squids::Const units;
   std::cout << "Begin creating nuSQuIDS Atmospheric Object" << std::endl;
-  nuSQUIDSLV nus(1.e2*units.GeV,1.e6*units.GeV,150,3,both,true,true);
+  nuSQUIDSLV nus(logspace(1.e2*units.GeV,1.e6*units.GeV,150),3,both,true);
   std::cout << "End creating nuSQuIDS Atmospheric Object" << std::endl;
 
   double phi = acos(-1.);

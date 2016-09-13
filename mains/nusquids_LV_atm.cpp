@@ -20,7 +20,7 @@ int main()
   const unsigned int numneu = 3;
   squids::Const units;
   std::cout << "Begin creating nuSQuIDS Atmospheric Object" << std::endl;
-  nuSQUIDSAtm<nuSQUIDSLV> nus(-1,0.2,40,1.e2*units.GeV,1.e6*units.GeV,150,numneu,both,true,true);
+  nuSQUIDSAtm<nuSQUIDSLV> nus(linspace(-1,0.2,40),logspace(1.e2*units.GeV,1.e6*units.GeV,150),numneu,both,true);
   std::cout << "End creating nuSQuIDS Atmospheric Object" << std::endl;
 
   // set mixing angles and masses

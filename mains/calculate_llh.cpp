@@ -377,6 +377,7 @@ double llh(LLHWorkspace& ws, std::array<double, 3>& osc_params) {
                         indices[2]=pi;
                         p = (flavor == NUMU) ? 0 : 1;
                         y = (year == y2010) ? 0 : 1;
+                        double solid_angle = 2.*PI_CONSTANT*(ws.edges[year][flavor][coszenith_index][ci+1]-ws.edges[year][flavor][coszenith_index][ci]);
                         double fluxIntegral=*index_multi(*ws.convAtmosFlux[p],indices);
                         double DOM_eff_correction =*index_multi(*ws.convDOMEffCorrection[y],indices);
                         // chris does not separate between pions and kaon components. Lets just drop it all in the kaons.

@@ -217,7 +217,8 @@ int main(int argc, char** argv)
                                 expectation_events[irow][1], // costh bin center
                                 expectation_events[irow][2], // year
                                 expectation_events[irow][3], // kaon component
-                                expectation_events[irow][4])); // pion component
+                                expectation_events[irow][4], // pion component
+                                0.));// astro component
     }
 
     //============================= end loading event expectation  =============================//

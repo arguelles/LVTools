@@ -182,7 +182,7 @@ int main(int argc, char** argv)
                                     (edges[year][flavor][coszenith_index][ci]+edges[year][flavor][coszenith_index][ci+1])/2., // costh bin center
                                     year == y2010 ? 2010 : 2011, // year
                                     kaon_event_expectation[year][ci][pi], // amount of kaon component events
-                                    pion_event_expectation[year][ci][pi])); // amount of pion component events
+                                    pion_event_expectation[year][ci][pi],0.)); // amount of pion component events
         }
       }
     }
