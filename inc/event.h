@@ -36,13 +36,13 @@ class Event{
       year(year)
     {}
 
- Event(double energy_proxy,double costh,unsigned int year, double conv_kaon_event, double conv_pion_event, double astro_event):
+ Event(double energy_proxy,double costh,unsigned int year, double conv_kaon_event, double conv_pion_event, double prompt_event=0., double astro_event=0.):
       energy_proxy(energy_proxy),
       energy_neutrino(std::numeric_limits<double>::quiet_NaN()),
       costh(costh),
       conv_pion_event(conv_pion_event),
       conv_kaon_event(conv_kaon_event),
-      prompt_event(0),
+      prompt_event(prompt_event),
       astro_event(astro_event),
       year(year)
     {}

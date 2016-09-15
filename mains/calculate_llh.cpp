@@ -46,6 +46,9 @@ fitResult doFitLBFGSB(LikelihoodType& likelihood, const std::vector<double>& see
   minimizer.addParameter(seed[0],.001,0.0); // if the normalization is allow to be zero it all goes crazy.
   minimizer.addParameter(seed[1],.005);
   minimizer.addParameter(seed[2],.01,0.0);
+  minimizer.addParameter(seed[3],.001,0.0); // if the normalization is allow to be zero it all goes crazy.
+  minimizer.addParameter(seed[4],.001,0.0); // if the normalization is allow to be zero it all goes crazy.
+  minimizer.addParameter(seed[5],.005);
 
   for(auto idx : indicesToFix)
     minimizer.fixParameter(idx);
@@ -195,7 +198,7 @@ public:
 struct DiffuseFitWeighterMaker{
 private:
 	static constexpr double medianConvEnergy=2020; // GeV
-	//static constexpr double medianPromptEnergy=7887; // GeV
+	static constexpr double medianPromptEnergy=7887; // GeV
 	static constexpr double medianAstroEnergy=1.0e5; // GeV
 public:
 	DiffuseFitWeighterMaker()
@@ -204,18 +207,20 @@ public:
 	template<typename DataType>
 	std::function<DataType(const Event&)> operator()(const std::vector<DataType>& params) const{
     // check that we are getting the right number of nuisance parameters
-		assert(params.size()==5);
+		assert(params.size()==6);
 		//unpack things so we have legible names
 		DataType convNorm=params[0];
 		DataType CRDeltaGamma=params[1];
 		DataType piKRatio=params[2];
-		DataType astroNorm=params[3];
-		DataType astroDeltaGamma=params[4];
+		DataType promptNorm=params[3];
+		DataType astroNorm=params[4];
+		DataType astroDeltaGamma=params[5];
 
 		using cachedWeighter=cachedValueWeighter<DataType,Event,double>;
 		cachedWeighter convPionFlux(&Event::conv_pion_event); // we get the pion component
 		cachedWeighter convKaonFlux(&Event::conv_kaon_event); // we get the kaon component
-		cachedWeighter astroFlux(&Event::astro_event); // we get the pion component
+		cachedWeighter promptFlux(&Event::prompt_event); // we get the prompt component
+		cachedWeighter astroFlux(&Event::astro_event); // we get the astro component
 
 		auto conventionalComponent = convNorm*(convPionFlux + piKRatio*convKaonFlux)
 		                             *powerlawTiltWeighter<Event,DataType>(medianConvEnergy, CRDeltaGamma); // we sum them upp according to some pi/k ratio.
@@ -223,14 +228,10 @@ public:
 		auto astroComponent = astroNorm*(astroFlux)
 		                             *powerlawTiltWeighter<Event,DataType>(medianAstroEnergy, astroDeltaGamma); // constructing the astrophysical component with a tilt
 
-    /*
-     * We will deal with the prompt component later. CA
 		auto promptComponent = promptNorm*promptFlux
 		                       *powerlawTiltWeighter<Event,DataType>(medianPromptEnergy, CRDeltaGamma);
 
-    */
-
-		return (conventionalComponent + astroComponent);
+		return (conventionalComponent + promptComponent + astroComponent);
 	}
 };
 
@@ -257,7 +258,8 @@ const double maxCosth = 0.2;
 
 const bool quiet = true;//false;
 const size_t evalThreads=1;
-const std::vector<double> fitSeed {1.,0.,1.,1.,0.}; // normalization, deltaGamma, pi/K ratio
+const std::vector<double> fitSeed {1.,0.,1.,1.,1.,0.};
+// normalization, deltaGamma, pi/K ratio, prompt normalization, astrophysical normalization, astrophysical index
 
 struct LLHWorkspace {
   std::deque<Event>& observed_events;
@@ -276,7 +278,9 @@ struct LLHWorkspace {
   nuSQUIDSAtm<nuSQUIDSLV>* nus_kaon;
   nuSQUIDSAtm<nuSQUIDSLV>* nus_pion;
 
+  // legacy:
   multidim** convAtmosFlux;
+  // fluxes use:
   multidim** convPionAtmosFlux;
   multidim** convKaonAtmosFlux;
   multidim** promptAtmosFlux;
@@ -350,6 +354,7 @@ double llh(LLHWorkspace& ws, std::array<double, 3>& osc_params) {
                 // double DOM_eff_correction =*index_multi(*convDOMEffCorrection[y],indices);
                 kaon_event_expectation[year][ci][pi] += DOM_eff_correction*solid_angle*m2Tocm2*ws.livetime[year]*ws.areas[year][flavor][ei][ci][pi]*kaon_integrated_flux;
                 pion_event_expectation[year][ci][pi] += DOM_eff_correction*solid_angle*m2Tocm2*ws.livetime[year]*ws.areas[year][flavor][ei][ci][pi]*pion_integrated_flux;
+                prompt_event_expectation[year][ci][pi] += 0.; // no nusquids flux yet for prompt
                 astro_event_expectation[year][ci][pi] += DOM_eff_correction*solid_angle*m2Tocm2*ws.livetime[year]*ws.areas[year][flavor][ei][ci][pi]*astro_integrated_flux;
             }
           }
@@ -385,11 +390,15 @@ double llh(LLHWorkspace& ws, std::array<double, 3>& osc_params) {
                         p = (flavor == NUMU) ? 0 : 1;
                         y = (year == y2010) ? 0 : 1;
                         double solid_angle = 2.*PI_CONSTANT*(ws.edges[year][flavor][coszenith_index][ci+1]-ws.edges[year][flavor][coszenith_index][ci]);
-                        double fluxIntegral=*index_multi(*ws.convAtmosFlux[p],indices);
+                        double pion_fluxIntegral=*index_multi(*ws.convPionAtmosFlux[p],indices);
+                        double kaon_fluxIntegral=*index_multi(*ws.convKaonAtmosFlux[p],indices);
+                        double prompt_fluxIntegral=*index_multi(*ws.promptAtmosFlux[p],indices);
                         double DOM_eff_correction =*index_multi(*ws.convDOMEffCorrection[y],indices);
                         // chris does not separate between pions and kaon components. Lets just drop it all in the kaons.
                         // also chris has already included the solid angle factor in the flux
-                        kaon_event_expectation[year][ci][pi] += m2Tocm2*ws.livetime[year]*ws.areas[year][flavor][ei][ci][pi]*DOM_eff_correction*fluxIntegral * p_osc;
+                        kaon_event_expectation[year][ci][pi] += m2Tocm2*ws.livetime[year]*ws.areas[year][flavor][ei][ci][pi]*DOM_eff_correction*pion_fluxIntegral * p_osc;
+                        pion_event_expectation[year][ci][pi] += m2Tocm2*ws.livetime[year]*ws.areas[year][flavor][ei][ci][pi]*DOM_eff_correction*kaon_fluxIntegral * p_osc;
+                        prompt_event_expectation[year][ci][pi] += m2Tocm2*ws.livetime[year]*ws.areas[year][flavor][ei][ci][pi]*DOM_eff_correction*prompt_fluxIntegral * p_osc;
                         astro_event_expectation[year][ci][pi] += DOM_eff_correction*solid_angle*m2Tocm2*ws.livetime[year]*ws.areas[year][flavor][ei][ci][pi]*astro_integrated_flux;
                         if (kaon_event_expectation[year][ci][pi] < 0) throw std::runtime_error("badness");
                       }
@@ -414,6 +423,7 @@ double llh(LLHWorkspace& ws, std::array<double, 3>& osc_params) {
                                     year == y2010 ? 2010 : 2011, // year
                                     ws.kaon_event_expectation[year][ci][pi],  // amount of kaon component events
                                     ws.pion_event_expectation[year][ci][pi],  // amount of pion component events
+	                                  ws.prompt_event_expectation[year][ci][pi],// amount of prompt component events
 	                                  ws.astro_event_expectation[year][ci][pi]));// amount of astrophysical component events
         }
       }
@@ -491,22 +501,22 @@ double llh(LLHWorkspace& ws, std::array<double, 3>& osc_params) {
     likelihood::GaussianPrior normalizationPrior(1.,0.4);//0.4
     likelihood::GaussianPrior crSlopePrior(0.0,0.05);
     likelihood::GaussianPrior kaonPrior(1.0,0.1);
-    //double N0min = 1.0e-9; double N0max = 1.0e-7;
+    likelihood::UniformPrior prompt_norm(0.0,std::numeric_limits<double>::infinity());
     likelihood::UniformPrior astro_norm(0.0,std::numeric_limits<double>::infinity());
     likelihood::UniformPrior astro_gamma(-0.5,0.5);
 
-    auto priors=makePriorSet(normalizationPrior,crSlopePrior,kaonPrior,astro_norm, astro_gamma);
+    auto priors=makePriorSet(normalizationPrior,crSlopePrior,kaonPrior,prompt_norm,astro_norm,astro_gamma);
     // construct a MC event reweighter
     DiffuseFitWeighterMaker DFWM;
     // construct likelihood problem
     // there are two numbers here. The first number is the number of histogram dimension, in this case 3.
     // The second number is the number of nuisance parameters, it is 3 for conventional-only,
-    // and 5 for conventional+astro, and XX for conventional+astro+prompt.
-    auto prob=likelihood::makeLikelihoodProblem<std::reference_wrapper<const Event>,3,5>(data_hist, {sim_hist}, priors, {1.0}, likelihood::simpleDataWeighter(), DFWM, likelihood::poissonLikelihood(), fitSeed);
+    // and 5 for conventional+astro, and 6 for conventional+astro+prompt.
+    auto prob=likelihood::makeLikelihoodProblem<std::reference_wrapper<const Event>,3,6>(data_hist, {sim_hist}, priors, {1.0}, likelihood::simpleDataWeighter(), DFWM, likelihood::poissonLikelihood(), fitSeed);
     prob.setEvaluationThreadCount(evalThreads);
 
     std::vector<double> seed=prob.getSeed();
-    std::vector<unsigned int> fixedIndices = {2};
+    std::vector<unsigned int> fixedIndices = {}; // nuisance parameters that will be fixed
     paramFixSpec fixedParams;
     for(const auto pf : fixedParams.params){
       if(!quiet)
@@ -540,7 +550,7 @@ double llh(LLHWorkspace& ws, std::array<double, 3>& osc_params) {
 
 int main(int argc, char** argv)
 {
-    if(argc < 7){
+    if(argc < 6){
         std::cout << "Invalid number of arguments. The arguments should be given as follows: \n"
                      "1) Path to the effective area hdf5.\n"
                      "2) Path to the observed events file.\n"
@@ -683,6 +693,11 @@ int main(int argc, char** argv)
 
 //#######################
 
+    // do only one parameter
+    std::cout << llh(llh_ws,osc_params) << std::endl;
+
+    /*
+    // loop of death
     double llh_val[100][100][100] = {0};
     for (int i = 0; i < 100; i++) {
       for (int j = 0; j < 100; j++) {
@@ -701,8 +716,8 @@ int main(int argc, char** argv)
       std::ofstream output_file(output_file_str, std::ios::out | std::ios::binary);
       output_file.write((char*)llh_val, sizeof(llh_val));
       output_file.close();
-
     }
+    */
 
     //============================= likelihood problem ends =============================//
 
