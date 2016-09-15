@@ -256,7 +256,8 @@ const double maxFitEnergy = 1.8e4;
 const double minCosth = -1;
 const double maxCosth = 0.2;
 
-const bool quiet = true;//false;
+const bool quiet = false;
+//const bool quiet = true;
 const size_t evalThreads=1;
 const std::vector<double> fitSeed {1.,0.,1.,1.,1.,0.};
 // normalization, deltaGamma, pi/K ratio, prompt normalization, astrophysical normalization, astrophysical index
@@ -396,8 +397,8 @@ double llh(LLHWorkspace& ws, std::array<double, 3>& osc_params) {
                         double DOM_eff_correction =*index_multi(*ws.convDOMEffCorrection[y],indices);
                         // chris does not separate between pions and kaon components. Lets just drop it all in the kaons.
                         // also chris has already included the solid angle factor in the flux
-                        kaon_event_expectation[year][ci][pi] += m2Tocm2*ws.livetime[year]*ws.areas[year][flavor][ei][ci][pi]*DOM_eff_correction*pion_fluxIntegral * p_osc;
-                        pion_event_expectation[year][ci][pi] += m2Tocm2*ws.livetime[year]*ws.areas[year][flavor][ei][ci][pi]*DOM_eff_correction*kaon_fluxIntegral * p_osc;
+                        kaon_event_expectation[year][ci][pi] += m2Tocm2*ws.livetime[year]*ws.areas[year][flavor][ei][ci][pi]*DOM_eff_correction*kaon_fluxIntegral * p_osc;
+                        pion_event_expectation[year][ci][pi] += m2Tocm2*ws.livetime[year]*ws.areas[year][flavor][ei][ci][pi]*DOM_eff_correction*pion_fluxIntegral * p_osc;
                         prompt_event_expectation[year][ci][pi] += m2Tocm2*ws.livetime[year]*ws.areas[year][flavor][ei][ci][pi]*DOM_eff_correction*prompt_fluxIntegral * p_osc;
                         astro_event_expectation[year][ci][pi] += DOM_eff_correction*solid_angle*m2Tocm2*ws.livetime[year]*ws.areas[year][flavor][ei][ci][pi]*astro_integrated_flux;
                         if (kaon_event_expectation[year][ci][pi] < 0) throw std::runtime_error("badness");
@@ -534,11 +535,12 @@ double llh(LLHWorkspace& ws, std::array<double, 3>& osc_params) {
     // minimize over the nuisance parameters
     fitResult fr = doFitLBFGSB(prob,seed,fixedIndices);
 
-    if(!quiet)
+    if(!quiet){
       std::cout << "Fitted Hypothesis: ";
-    /*for(unsigned int i=0; i<fr.params.size(); i++)
+    for(unsigned int i=0; i<fr.params.size(); i++)
       std::cout << fr.params[i] << ' ';
-    std::cout << std::setprecision(10) << fr.likelihood << std::setprecision(6) << ' ' << (fr.succeeded?"succeeded":"failed") << std::endl;*/
+    std::cout << std::setprecision(10) << fr.likelihood << std::setprecision(6) << ' ' << (fr.succeeded?"succeeded":"failed") << std::endl;
+    }
     return fr.likelihood;//fr.params[2];//
 }
 
@@ -550,7 +552,7 @@ double llh(LLHWorkspace& ws, std::array<double, 3>& osc_params) {
 
 int main(int argc, char** argv)
 {
-    if(argc < 6){
+    if(not (argc == 7 or argc ==8)){
         std::cout << "Invalid number of arguments. The arguments should be given as follows: \n"
                      "1) Path to the effective area hdf5.\n"
                      "2) Path to the observed events file.\n"
@@ -562,14 +564,22 @@ int main(int argc, char** argv)
                      << std::endl;
         exit(1);
     }
-    // paths 
+
+    // default hypothesis
+    std::array<double, 3> osc_params = {1.e-30, 1.0e-30, 1.0e-30}; // close to null
+    //std::array<double, 3> osc_params = {1e-25, 1e-25, 1e-25};
+
+    IntegrateWorkspace ws(5000);
+    // paths
     std::string effective_area_filename = std::string(argv[1]);
     std::string data_filename = std::string(argv[2]);
     std::string chris_flux_filename = std::string(argv[3]); // also contains DOM efficiency correction
     std::string kaon_filename = std::string(argv[4]);
     std::string pion_filename = std::string(argv[5]);
     std::string prompt_filename = std::string(argv[6]);
-    std::string output_file_str = std::string(argv[7]);
+
+    std::string output_file_str;
+    if(argc==8) output_file_str = std::string(argv[7]);
 
     //============================== SETTINGS ===================================//
     //============================== SETTINGS ===================================//
@@ -612,9 +622,6 @@ int main(int argc, char** argv)
     nusquids::marray<double,3> prompt_event_expectation{number_of_years,cosZenithBins,energyProxyBins};
     nusquids::marray<double,3>astro_event_expectation{number_of_years,cosZenithBins,energyProxyBins};
 
-    std::array<double, 3> osc_params = {1e-25, 1e-25, 1e-25};
-
-    IntegrateWorkspace ws(5000);
 
     //not sure astro_event fit here
     LLHWorkspace llh_ws = {observed_events, kaon_event_expectation, pion_event_expectation, prompt_event_expectation, astro_event_expectation, ws, edges, areas, livetime, nullptr, nullptr, nullptr, nullptr};
