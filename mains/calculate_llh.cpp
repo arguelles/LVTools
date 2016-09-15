@@ -264,6 +264,7 @@ struct LLHWorkspace {
 
   nusquids::marray<double,3>& kaon_event_expectation;
   nusquids::marray<double,3>& pion_event_expectation;
+  nusquids::marray<double,3>& prompt_event_expectation;
   nusquids::marray<double,3>&astro_event_expectation;
 
   IntegrateWorkspace& ws;
@@ -276,6 +277,9 @@ struct LLHWorkspace {
   nuSQUIDSAtm<nuSQUIDSLV>* nus_pion;
 
   multidim** convAtmosFlux;
+  multidim** convPionAtmosFlux;
+  multidim** convKaonAtmosFlux;
+  multidim** promptAtmosFlux;
   multidim** convDOMEffCorrection;
 };
 
@@ -284,11 +288,14 @@ double llh(LLHWorkspace& ws, std::array<double, 3>& osc_params) {
 
     nusquids::marray<double,3>& kaon_event_expectation = ws.kaon_event_expectation;
     nusquids::marray<double,3>& pion_event_expectation = ws.pion_event_expectation;
-    nusquids::marray<double,3>&astro_event_expectation =ws.astro_event_expectation;
+    nusquids::marray<double,3>& prompt_event_expectation = ws.prompt_event_expectation;
+    nusquids::marray<double,3>&astro_event_expectation = ws.astro_event_expectation;
 
     for(auto it = kaon_event_expectation.begin(); it < kaon_event_expectation.end(); it++)
         *it = 0.;
     for(auto it = pion_event_expectation.begin(); it < pion_event_expectation.end(); it++)
+        *it = 0.;
+    for(auto it = prompt_event_expectation.begin(); it < prompt_event_expectation.end(); it++)
         *it = 0.;
     for(auto it =astro_event_expectation.begin(); it <astro_event_expectation.end(); it++)
         *it = 0.;
@@ -533,16 +540,26 @@ double llh(LLHWorkspace& ws, std::array<double, 3>& osc_params) {
 
 int main(int argc, char** argv)
 {
-    if(argc < 5){
+    if(argc < 7){
         std::cout << "Invalid number of arguments. The arguments should be given as follows: \n"
                      "1) Path to the effective area hdf5.\n"
                      "2) Path to the observed events file.\n"
-                     "3) Path to the kaon component nusquids calculated flux.\n"
-                     "4) Path to the pion component nusquids calculated flux.\n"
-                     "5) [optional] Path to output the event expectations.\n"
+                     "3) Path to Chris flux file with DOM efficiency correction.\n"
+                     "4) Path to the kaon component flux.\n"
+                     "5) Path to the pion component flux.\n"
+                     "6) Path to the prompt component flux.\n"
+                     "7) [optional] Path to output the event expectations.\n"
                      << std::endl;
         exit(1);
     }
+    // paths 
+    std::string effective_area_filename = std::string(argv[1]);
+    std::string data_filename = std::string(argv[2]);
+    std::string chris_flux_filename = std::string(argv[3]); // also contains DOM efficiency correction
+    std::string kaon_filename = std::string(argv[4]);
+    std::string pion_filename = std::string(argv[5]);
+    std::string prompt_filename = std::string(argv[6]);
+    std::string output_file_str = std::string(argv[7]);
 
     //============================== SETTINGS ===================================//
     //============================== SETTINGS ===================================//
@@ -555,7 +572,7 @@ int main(int argc, char** argv)
     if(!quiet){
       std::cout << "Reading events from data file." << std::endl;
     }
-    marray<double,2> observed_data = quickread(std::string(argv[2]));
+    marray<double,2> observed_data = quickread(data_filename);
     std::deque<Event> observed_events;
     for(unsigned int irow = 0; irow < observed_data.extent(0); irow++){
       observed_events.push_back(Event(observed_data[irow][0],// energy proxy
@@ -570,7 +587,7 @@ int main(int argc, char** argv)
     }
 
     AreaEdges edges;
-    AreaArray areas = get_areas(std::string(argv[1]), edges);
+    AreaArray areas = get_areas(std::string(effective_area_filename), edges);
 
     //std::cout << "Printing out the number of edges. Just a sanity check." << std::endl;
     //std::cout << edges[y2010][NUMU][neutrino_energy_index].extent(0) << std::endl;
@@ -582,6 +599,7 @@ int main(int argc, char** argv)
 
     nusquids::marray<double,3> kaon_event_expectation{number_of_years,cosZenithBins,energyProxyBins};
     nusquids::marray<double,3> pion_event_expectation{number_of_years,cosZenithBins,energyProxyBins};
+    nusquids::marray<double,3> prompt_event_expectation{number_of_years,cosZenithBins,energyProxyBins};
     nusquids::marray<double,3>astro_event_expectation{number_of_years,cosZenithBins,energyProxyBins};
 
     std::array<double, 3> osc_params = {1e-25, 1e-25, 1e-25};
@@ -589,7 +607,7 @@ int main(int argc, char** argv)
     IntegrateWorkspace ws(5000);
 
     //not sure astro_event fit here
-    LLHWorkspace llh_ws = {observed_events, kaon_event_expectation, pion_event_expectation, astro_event_expectation, ws, edges, areas, livetime, nullptr, nullptr, nullptr, nullptr};
+    LLHWorkspace llh_ws = {observed_events, kaon_event_expectation, pion_event_expectation, prompt_event_expectation, astro_event_expectation, ws, edges, areas, livetime, nullptr, nullptr, nullptr, nullptr};
 
 #ifndef USE_CHRIS_FLUX
     nuSQUIDSAtm<nuSQUIDSLV> nus_kaon((std::string(argv[3])));
@@ -603,10 +621,12 @@ int main(int argc, char** argv)
     multidim convDOMEffCorrection2011=alloc_multi(3,histogramDims);
     multidim* convDOMEffCorrection[2]={&convDOMEffCorrection2010,&convDOMEffCorrection2011};
 
-    hid_t file_id = H5Fopen(argv[3], H5F_ACC_RDONLY, H5P_DEFAULT);
+    // reading the DOM efficiency correction
+    hid_t file_id = H5Fopen(chris_flux_filename.c_str(), H5F_ACC_RDONLY, H5P_DEFAULT);
     readDataSet(file_id, "/detector_correction/2010", convDOMEffCorrection2010.data);
     readDataSet(file_id, "/detector_correction/2011", convDOMEffCorrection2011.data);
 
+    // reading Chris Combined Flux
     multidim convAtmosNuMu=alloc_multi(2,histogramDims);
     multidim convAtmosNuMuBar=alloc_multi(2,histogramDims);
     multidim* convAtmosFlux[2]={&convAtmosNuMu,&convAtmosNuMuBar};
@@ -616,8 +636,49 @@ int main(int argc, char** argv)
 
     H5Fclose(file_id);
 
+    // reading pion flux
+    hid_t pion_file_id = H5Fopen(pion_filename.c_str(), H5F_ACC_RDONLY, H5P_DEFAULT);
+
+    multidim convPionAtmosNuMu=alloc_multi(2,histogramDims);
+    multidim convPionAtmosNuMuBar=alloc_multi(2,histogramDims);
+    multidim* convPionAtmosFlux[2]={&convPionAtmosNuMu,&convPionAtmosNuMuBar};
+
+    readDataSet(pion_file_id, "/nu_mu/integrated_flux", convPionAtmosNuMu.data);
+    readDataSet(pion_file_id, "/nu_mu_bar/integrated_flux", convPionAtmosNuMuBar.data);
+
+    H5Fclose(pion_file_id);
+
+    // reading kaon flux
+    hid_t Kaon_file_id = H5Fopen(kaon_filename.c_str(), H5F_ACC_RDONLY, H5P_DEFAULT);
+
+    multidim convKaonAtmosNuMu=alloc_multi(2,histogramDims);
+    multidim convKaonAtmosNuMuBar=alloc_multi(2,histogramDims);
+    multidim* convKaonAtmosFlux[2]={&convKaonAtmosNuMu,&convKaonAtmosNuMuBar};
+
+    readDataSet(Kaon_file_id, "/nu_mu/integrated_flux", convKaonAtmosNuMu.data);
+    readDataSet(Kaon_file_id, "/nu_mu_bar/integrated_flux", convKaonAtmosNuMuBar.data);
+
+    H5Fclose(Kaon_file_id);
+
+    // reading prompt flux
+    hid_t prompt_file_id = H5Fopen(prompt_filename.c_str(), H5F_ACC_RDONLY, H5P_DEFAULT);
+
+    multidim promptAtmosNuMu=alloc_multi(2,histogramDims);
+    multidim promptAtmosNuMuBar=alloc_multi(2,histogramDims);
+    multidim* promptAtmosFlux[2]={&promptAtmosNuMu,&promptAtmosNuMuBar};
+
+    readDataSet(Kaon_file_id, "/nu_mu/integrated_flux", promptAtmosNuMu.data);
+    readDataSet(Kaon_file_id, "/nu_mu_bar/integrated_flux", promptAtmosNuMuBar.data);
+
+    H5Fclose(prompt_file_id);
+
+    // put that in the box
+
     llh_ws.convDOMEffCorrection = convDOMEffCorrection;
     llh_ws.convAtmosFlux = convAtmosFlux;
+    llh_ws.convPionAtmosFlux = convPionAtmosFlux;
+    llh_ws.convKaonAtmosFlux = convKaonAtmosFlux;
+    llh_ws.promptAtmosFlux = promptAtmosFlux;
 #endif
 
 //#######################
@@ -636,9 +697,7 @@ int main(int argc, char** argv)
     }
     //std::cout << llh_val << std::endl;
 
-    if (argc > 5) {
-      std::string output_file_str=std::string(argv[5]);
-
+    if (argc > 6) {
       std::ofstream output_file(output_file_str, std::ios::out | std::ios::binary);
       output_file.write((char*)llh_val, sizeof(llh_val));
       output_file.close();
@@ -650,19 +709,6 @@ int main(int argc, char** argv)
     if(!quiet){
       std::cout << "Saving expectation." << std::endl;
     }
-
-    /*std::string output_file_str;;
-    if(argc > 5)
-      output_file_str=std::string(argv[5]);
-    else
-      output_file_str=std::string("./expectation.dat");
-
-    std::ofstream output_file(output_file_str);
-    auto weighter = DFWM(fr.params);
-    for(auto event : mc_events){
-      output_file << event.energy_proxy << " " << event.costh << " " << event.year << " " << weighter(event) << std::endl;
-    }
-    output_file.close();*/
 
     return 0;
 }
