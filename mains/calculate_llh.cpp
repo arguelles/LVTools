@@ -1,3 +1,6 @@
+#ifndef LV_SEARCH_H_INCLUDED
+#define LV_SEARCH_H_INCLUDED
+
 #include <vector>
 #include <iostream>
 #include <nuSQuIDS/nuSQuIDS.h>
@@ -278,6 +281,7 @@ struct LLHWorkspace {
 
   nuSQUIDSAtm<nuSQUIDSLV>* nus_kaon;
   nuSQUIDSAtm<nuSQUIDSLV>* nus_pion;
+  nuSQUIDSAtm<nuSQUIDSLV>* nus_prompt;
 
   // legacy:
   multidim** convAtmosFlux;
@@ -627,10 +631,12 @@ int main(int argc, char** argv)
     LLHWorkspace llh_ws = {observed_events, kaon_event_expectation, pion_event_expectation, prompt_event_expectation, astro_event_expectation, ws, edges, areas, livetime, nullptr, nullptr, nullptr, nullptr};
 
 #ifndef USE_CHRIS_FLUX
-    nuSQUIDSAtm<nuSQUIDSLV> nus_kaon((std::string(argv[3])));
-    nuSQUIDSAtm<nuSQUIDSLV> nus_pion((std::string(argv[4])));
+    nuSQUIDSAtm<nuSQUIDSLV> nus_kaon(kaon_filename);
+    nuSQUIDSAtm<nuSQUIDSLV> nus_pion(pion_filename);
+    nuSQUIDSAtm<nuSQUIDSLV> nus_prompt(prompt_filename);
     llh_ws.nus_kaon = &nus_kaon;
     llh_ws.nus_pion = &nus_pion;
+    llh_ws.nus_prompt = &nus_prompt;
 #else
     //these share the same binning in the first two dimensions
     const unsigned int histogramDims[3]={neutrinoEnergyBins,cosZenithBins,energyProxyBins};

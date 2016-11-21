@@ -19,7 +19,7 @@ MAINS_SRC=$(wildcard mains/*.cpp)
 MAINS=$(patsubst mains/%.cpp,bin/%.exe,$(MAINS_SRC))
 #$(EXAMPLES_SRC:.cpp=.exe)
 
-CXXFLAGS=-g  -std=c++11 -I./inc
+CXXFLAGS= -std=c++11 -I./inc
 
 # Directories
 
