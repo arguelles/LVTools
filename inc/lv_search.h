@@ -24,143 +24,147 @@ using namespace nusquids;
 //==================== FITTER DEFINITIONS =========================//
 //==================== FITTER DEFINITIONS =========================//
 
-///Simple fit result structure
-struct fitResult{
+/// Simple fit result structure
+struct fitResult {
   std::vector<double> params;
   double likelihood;
   unsigned int nEval, nGrad;
   bool succeeded;
 };
 
-///A container to help with parsing index/value pairs for fixing likelihood parameters from the commandline
-struct paramFixSpec{
-	struct singleParam : std::pair<unsigned int, double>{};
-	std::vector<std::pair<unsigned int,double>> params;
+/// A container to help with parsing index/value pairs for fixing likelihood parameters from the
+/// commandline
+struct paramFixSpec {
+  struct singleParam : std::pair<unsigned int, double> {};
+  std::vector<std::pair<unsigned int, double>> params;
 };
 
-///Maximize a likelihood using the LBFGSB minimization algorithm
+/// Maximize a likelihood using the LBFGSB minimization algorithm
 ///\param likelihood The likelihood to maximize
 ///\param seed The seed values for all likelihood parameters
 ///\param indicesToFix The indices of likelihood parameters to hold constant at their seed va>
-template<typename LikelihoodType>
-fitResult doFitLBFGSB(LikelihoodType& likelihood, const std::vector<double>& seed,
-            std::vector<unsigned int> indicesToFix={}){
+template <typename LikelihoodType>
+fitResult doFitLBFGSB(LikelihoodType &likelihood, const std::vector<double> &seed,
+                      std::vector<unsigned int> indicesToFix = {}) {
   using namespace likelihood;
 
   LBFGSB_Driver minimizer;
-  //minimizer.addParameter(SEED, MAGIC_NUMBER, MINIMUM, MAXIMUM);
-  minimizer.addParameter(seed[0],.001,0.0); // if the normalization is allow to be zero it all goes crazy.
-  minimizer.addParameter(seed[1],.005);
-  minimizer.addParameter(seed[2],.01,0.0);
-  minimizer.addParameter(seed[3],.001,0.0); // if the normalization is allow to be zero it all goes crazy.
-  minimizer.addParameter(seed[4],.001,0.0); // if the normalization is allow to be zero it all goes crazy.
-  minimizer.addParameter(seed[5],.005);
+  // minimizer.addParameter(SEED, MAGIC_NUMBER, MINIMUM, MAXIMUM);
+  minimizer.addParameter(seed[0], .001,
+                         0.0); // if the normalization is allow to be zero it all goes crazy.
+  minimizer.addParameter(seed[1], .005);
+  minimizer.addParameter(seed[2], .01, 0.0);
+  minimizer.addParameter(seed[3], .001,
+                         0.0); // if the normalization is allow to be zero it all goes crazy.
+  minimizer.addParameter(seed[4], .001,
+                         0.0); // if the normalization is allow to be zero it all goes crazy.
+  minimizer.addParameter(seed[5], .005);
 
-  for(auto idx : indicesToFix)
+  for (auto idx : indicesToFix)
     minimizer.fixParameter(idx);
 
   minimizer.setChangeTolerance(1e-5);
 
   minimizer.setHistorySize(20);
-  //std::cout << seed[0] << " " << seed[1] << " " << seed[2] << std::endl;
+  // std::cout << seed[0] << " " << seed[1] << " " << seed[2] << std::endl;
 
   fitResult result;
-  result.succeeded=minimizer.minimize(BFGS_Function<LikelihoodType>(likelihood));
-  result.likelihood=minimizer.minimumValue();
-  result.params=minimizer.minimumPosition();
-  result.nEval=minimizer.numberOfEvaluations();
-  result.nGrad=minimizer.numberOfEvaluations();
+  result.succeeded = minimizer.minimize(BFGS_Function<LikelihoodType>(likelihood));
+  result.likelihood = minimizer.minimumValue();
+  result.params = minimizer.minimumPosition();
+  result.nEval = minimizer.numberOfEvaluations();
+  result.nGrad = minimizer.numberOfEvaluations();
 
-  return(result);
+  return (result);
 }
 
 //==================== NUISANCE PARAMETERS REWEIGHTERS =========================//
 //==================== NUISANCE PARAMETERS REWEIGHTERS =========================//
 
-
-template<typename T>
-struct powerlawWeighter : public GenericWeighter<powerlawWeighter<T>>{
+template <typename T> struct powerlawWeighter : public GenericWeighter<powerlawWeighter<T>> {
 private:
-	T index;
-public:
-	using result_type=T;
-	powerlawWeighter(T i):index(i){}
+  T index;
 
-	template<typename Event>
-	result_type operator()(const Event& e) const{
-		return(pow((double)e.primaryEnergy,index));
-	}
+public:
+  using result_type = T;
+  powerlawWeighter(T i) : index(i) {}
+
+  template <typename Event> result_type operator()(const Event &e) const {
+    return (pow((double)e.primaryEnergy, index));
+  }
 };
 
-//Tilt a spectrum by an incremental powerlaw index about a precomputed median energy
-template<typename Event, typename T>
-struct powerlawTiltWeighter : public GenericWeighter<powerlawTiltWeighter<Event,T>>{
+// Tilt a spectrum by an incremental powerlaw index about a precomputed median energy
+template <typename Event, typename T>
+struct powerlawTiltWeighter : public GenericWeighter<powerlawTiltWeighter<Event, T>> {
 private:
-	double medianEnergy;
-	T deltaIndex;
-	//typename Event::crTiltValues Event::* cachedData;
+  double medianEnergy;
+  T deltaIndex;
+  // typename Event::crTiltValues Event::* cachedData;
 public:
-	using result_type=T;
-	powerlawTiltWeighter(double me, T dg/*, typename Event::crTiltValues Event::* c*/):
-	medianEnergy(me),deltaIndex(dg)/*,cachedData(c)*/{}
+  using result_type = T;
+  powerlawTiltWeighter(double me, T dg /*, typename Event::crTiltValues Event::* c*/)
+      : medianEnergy(me), deltaIndex(dg) /*,cachedData(c)*/ {}
 
-	result_type operator()(const Event& e) const{
-		//const typename Event::crTiltValues& cache=e.*cachedData;
-		result_type weight=pow(e.energy_proxy/medianEnergy,-deltaIndex);
-		return(weight);
-	}
+  result_type operator()(const Event &e) const {
+    // const typename Event::crTiltValues& cache=e.*cachedData;
+    result_type weight = pow(e.energy_proxy / medianEnergy, -deltaIndex);
+    return (weight);
+  }
 };
 
-template<typename T, typename Event, typename U>
-struct cachedValueWeighter : public GenericWeighter<cachedValueWeighter<T,Event,U>>{
+template <typename T, typename Event, typename U>
+struct cachedValueWeighter : public GenericWeighter<cachedValueWeighter<T, Event, U>> {
 private:
-	U Event::* cachedPtr;
+  U Event::*cachedPtr;
+
 public:
-	using result_type=T;
-	cachedValueWeighter(U Event::* ptr):cachedPtr(ptr){}
-	result_type operator()(const Event& e) const{
-		return(result_type(e.*cachedPtr));
-	}
+  using result_type = T;
+  cachedValueWeighter(U Event::*ptr) : cachedPtr(ptr) {}
+  result_type operator()(const Event &e) const { return (result_type(e.*cachedPtr)); }
 };
 
-struct DiffuseFitWeighterMaker{
+struct DiffuseFitWeighterMaker {
 private:
-	static constexpr double medianConvEnergy=2020; // GeV
-	static constexpr double medianPromptEnergy=7887; // GeV
-	static constexpr double medianAstroEnergy=1.0e5; // GeV
+  static constexpr double medianConvEnergy = 2020;   // GeV
+  static constexpr double medianPromptEnergy = 7887; // GeV
+  static constexpr double medianAstroEnergy = 1.0e5; // GeV
 public:
-	DiffuseFitWeighterMaker()
-	{}
+  DiffuseFitWeighterMaker() {}
 
-	template<typename DataType>
-	std::function<DataType(const Event&)> operator()(const std::vector<DataType>& params) const{
+  template <typename DataType>
+  std::function<DataType(const Event &)> operator()(const std::vector<DataType> &params) const {
     // check that we are getting the right number of nuisance parameters
-		assert(params.size()==6);
-		//unpack things so we have legible names
-		DataType convNorm=params[0];
-		DataType CRDeltaGamma=params[1];
-		DataType piKRatio=params[2];
-		DataType promptNorm=params[3];
-		DataType astroNorm=params[4];
-		DataType astroDeltaGamma=params[5];
+    assert(params.size() == 6);
+    // unpack things so we have legible names
+    DataType convNorm = params[0];
+    DataType CRDeltaGamma = params[1];
+    DataType piKRatio = params[2];
+    DataType promptNorm = params[3];
+    DataType astroNorm = params[4];
+    DataType astroDeltaGamma = params[5];
 
-		using cachedWeighter=cachedValueWeighter<DataType,Event,double>;
-		cachedWeighter convPionFlux(&Event::conv_pion_event); // we get the pion component
-		cachedWeighter convKaonFlux(&Event::conv_kaon_event); // we get the kaon component
-		cachedWeighter promptFlux(&Event::prompt_event); // we get the prompt component
-		cachedWeighter astroFlux(&Event::astro_event); // we get the astro component
+    using cachedWeighter = cachedValueWeighter<DataType, Event, double>;
+    cachedWeighter convPionFlux(&Event::conv_pion_event); // we get the pion component
+    cachedWeighter convKaonFlux(&Event::conv_kaon_event); // we get the kaon component
+    cachedWeighter promptFlux(&Event::prompt_event);      // we get the prompt component
+    cachedWeighter astroFlux(&Event::astro_event);        // we get the astro component
 
-		auto conventionalComponent = convNorm*(convPionFlux + piKRatio*convKaonFlux)
-		                             *powerlawTiltWeighter<Event,DataType>(medianConvEnergy, CRDeltaGamma); // we sum them upp according to some pi/k ratio.
+    auto conventionalComponent =
+        convNorm * (convPionFlux + piKRatio * convKaonFlux) *
+        powerlawTiltWeighter<Event, DataType>(
+            medianConvEnergy, CRDeltaGamma); // we sum them upp according to some pi/k ratio.
 
-		auto astroComponent = astroNorm*(astroFlux)
-		                             *powerlawTiltWeighter<Event,DataType>(medianAstroEnergy, astroDeltaGamma); // constructing the astrophysical component with a tilt
+    auto astroComponent =
+        astroNorm * (astroFlux)*powerlawTiltWeighter<Event, DataType>(
+                        medianAstroEnergy,
+                        astroDeltaGamma); // constructing the astrophysical component with a tilt
 
-		auto promptComponent = promptNorm*promptFlux
-		                       *powerlawTiltWeighter<Event,DataType>(medianPromptEnergy, CRDeltaGamma);
+    auto promptComponent = promptNorm * promptFlux *
+                           powerlawTiltWeighter<Event, DataType>(medianPromptEnergy, CRDeltaGamma);
 
-		return (conventionalComponent + promptComponent + astroComponent);
-	}
+    return (conventionalComponent + promptComponent + astroComponent);
+  }
 };
 
 //==================== AVERAGE FLUX CALCULATORS  =========================//
@@ -174,7 +178,9 @@ double GetAveragedFlux(IntegrateWorkspace &ws, nuSQUIDSAtm<nuSQUIDSLV> *nus, PTy
     return 0.;
   if (enu_max <= 1.0e2)
     return 0.;
-  double GeV = 1.0e9;
+  const double GeV = 1.0e9;
+  const double integration_error = 1e-3;
+  const unsigned int integration_iterations = 5000;
   if (flavor == NUMU) {
     return integrate(ws, [&](double enu) { return (nus->EvalFlavor(1, costh, enu * GeV, 0)); },
                      enu_min, enu_max, integration_error, integration_iterations);
@@ -197,6 +203,8 @@ double GetAvgPOsc(IntegrateWorkspace &ws, std::array<double, 3> params, PTypes f
     throw std::runtime_error("Min energy in the bin larger than large energy in the bin.");
 
   const double earth_diameter = 2 * 6371; // km
+  const double integration_error = 1e-3;
+  const unsigned int integration_iterations = 5000;
 
   double baseline_0 = -earth_diameter * costh_max, baseline_1 = -earth_diameter * costh_min;
   if (flavor == NUMU || flavor == NUMUBAR) {
@@ -243,6 +251,8 @@ double GetAvgAstroPOsc(IntegrateWorkspace &ws, std::array<double, 3> params, PTy
     throw std::runtime_error("Min energy in the bin larger than large energy in the bin.");
 
   if (flavor == NUMU || flavor == NUMUBAR) {
+    const double integration_error = 1e-3;
+    const unsigned int integration_iterations = 5000;
     return integrate(ws, [&](double enu) {
              return LV::OscillationProbabilityTwoFlavorLV_Astro(enu, params[0], params[1],
                                                                 params[2]);
@@ -263,6 +273,12 @@ auto binner = [](HistType &h, const Event &e) {
   h.add(e.energy_proxy, e.costh, e.year, amount(std::cref(e)));
 };
 
+template<typename ContainerType, typename HistType, typename BinnerType>
+void bin(const ContainerType& data, HistType& hist, const BinnerType& binner){
+  for(const Event& event : data)
+    binner(hist,event);
+}
+
 class LVSearch {
 private:
   bool quiet = false;
@@ -276,10 +292,18 @@ private:
   const unsigned int cosZenithBins = 11;
   const unsigned int energyProxyBins = 50;
   const unsigned int number_of_years = 2;
+  const unsigned int histogramDims[3] = {neutrinoEnergyBins, cosZenithBins, energyProxyBins};
+  const double minFitEnergy = 4.0e2;
+  const double maxFitEnergy = 1.8e4;
+  const double minCosth = -1;
+  const double maxCosth = 0.2;
 
+  // evaluation
+  size_t evalThreads=1;
+  std::vector<double> fitSeed {1.,0.,1.,1.,1.,0.};
 protected:
   // gsl workspace
-  IntegrateWorkspace& ws(5000);
+  IntegrateWorkspace ws;
   // events
   marray<double, 2> observed_data;
   std::deque<Event> observed_events;
@@ -288,7 +312,7 @@ protected:
   AreaEdges edges;
   AreaArray areas;
   // lifetimes
-  std::array<double, 2> &livetime;
+  std::array<double, 2> livetime;
   // nusquids fluxes
   nuSQUIDSAtm<nuSQUIDSLV> *nus_kaon;
   nuSQUIDSAtm<nuSQUIDSLV> *nus_pion;
@@ -308,15 +332,14 @@ protected:
   nusquids::marray<double, 3> pion_event_expectation;
   nusquids::marray<double, 3> prompt_event_expectation;
   nusquids::marray<double, 3> astro_event_expectation;
-  // lifetime
-  std::array<double, 2> livetime;
 
 public:
   LVSearch(std::string effective_area_filename, std::string data_filename,
            std::string detector_correction_filename, std::string kaon_filename,
-           std::string pion_filename std::string prompt_filename) {
+           std::string pion_filename, std::string prompt_filename):
+    ws(IntegrateWorkspace(5000))
+   {
 
-    histogramDims[3] = {neutrinoEnergyBins, cosZenithBins, energyProxyBins};
     livetime[y2010] = 2.7282e+07;  // in seconds
     livetime[y2011] = 2.96986e+07; // in seconds
 
@@ -368,299 +391,298 @@ protected:
     areas = get_areas(effective_area_filename, edges);
   }
 
-  void LoadFluxes(kaon_filename, pion_filename, prompt_filename);
-  if (!quiet)
-    std::cout << "Loading fluxes." << std::endl;
+  void LoadFluxes(std::string kaon_filename, std::string pion_filename, std::string prompt_filename) {
+    if (!quiet)
+      std::cout << "Loading fluxes." << std::endl;
 
-  // reading pion flux
-  hid_t pion_file_id = H5Fopen(pion_filename.c_str(), H5F_ACC_RDONLY, H5P_DEFAULT);
+    // reading pion flux
+    hid_t pion_file_id = H5Fopen(pion_filename.c_str(), H5F_ACC_RDONLY, H5P_DEFAULT);
 
-  multidim convPionAtmosNuMu = alloc_multi(2, histogramDims);
-  multidim convPionAtmosNuMuBar = alloc_multi(2, histogramDims);
-  convPionAtmosFlux[2] = {&convPionAtmosNuMu, &convPionAtmosNuMuBar};
+    multidim convPionAtmosNuMu = alloc_multi(2, histogramDims);
+    multidim convPionAtmosNuMuBar = alloc_multi(2, histogramDims);
+    convPionAtmosFlux[2] = {&convPionAtmosNuMu, &convPionAtmosNuMuBar};
 
-  readDataSet(pion_file_id, "/nu_mu/integrated_flux", convPionAtmosNuMu.data);
-  readDataSet(pion_file_id, "/nu_mu_bar/integrated_flux", convPionAtmosNuMuBar.data);
+    readDataSet(pion_file_id, "/nu_mu/integrated_flux", convPionAtmosNuMu.data);
+    readDataSet(pion_file_id, "/nu_mu_bar/integrated_flux", convPionAtmosNuMuBar.data);
 
-  H5Fclose(pion_file_id);
+    H5Fclose(pion_file_id);
 
-  // reading kaon flux
-  hid_t Kaon_file_id = H5Fopen(kaon_filename.c_str(), H5F_ACC_RDONLY, H5P_DEFAULT);
+    // reading kaon flux
+    hid_t Kaon_file_id = H5Fopen(kaon_filename.c_str(), H5F_ACC_RDONLY, H5P_DEFAULT);
 
-  multidim convKaonAtmosNuMu = alloc_multi(2, histogramDims);
-  multidim convKaonAtmosNuMuBar = alloc_multi(2, histogramDims);
-  convKaonAtmosFlux[2] = {&convKaonAtmosNuMu, &convKaonAtmosNuMuBar};
+    multidim convKaonAtmosNuMu = alloc_multi(2, histogramDims);
+    multidim convKaonAtmosNuMuBar = alloc_multi(2, histogramDims);
+    convKaonAtmosFlux[2] = {&convKaonAtmosNuMu, &convKaonAtmosNuMuBar};
 
-  readDataSet(Kaon_file_id, "/nu_mu/integrated_flux", convKaonAtmosNuMu.data);
-  readDataSet(Kaon_file_id, "/nu_mu_bar/integrated_flux", convKaonAtmosNuMuBar.data);
+    readDataSet(Kaon_file_id, "/nu_mu/integrated_flux", convKaonAtmosNuMu.data);
+    readDataSet(Kaon_file_id, "/nu_mu_bar/integrated_flux", convKaonAtmosNuMuBar.data);
 
-  H5Fclose(Kaon_file_id);
+    H5Fclose(Kaon_file_id);
 
-  // reading prompt flux
-  hid_t prompt_file_id = H5Fopen(prompt_filename.c_str(), H5F_ACC_RDONLY, H5P_DEFAULT);
+    // reading prompt flux
+    hid_t prompt_file_id = H5Fopen(prompt_filename.c_str(), H5F_ACC_RDONLY, H5P_DEFAULT);
 
-  multidim promptAtmosNuMu = alloc_multi(2, histogramDims);
-  multidim promptAtmosNuMuBar = alloc_multi(2, histogramDims);
-  promptAtmosFlux[2] = {&promptAtmosNuMu, &promptAtmosNuMuBar};
+    multidim promptAtmosNuMu = alloc_multi(2, histogramDims);
+    multidim promptAtmosNuMuBar = alloc_multi(2, histogramDims);
+    promptAtmosFlux[2] = {&promptAtmosNuMu, &promptAtmosNuMuBar};
 
-  readDataSet(Kaon_file_id, "/nu_mu/integrated_flux", promptAtmosNuMu.data);
-  readDataSet(Kaon_file_id, "/nu_mu_bar/integrated_flux", promptAtmosNuMuBar.data);
+    readDataSet(Kaon_file_id, "/nu_mu/integrated_flux", promptAtmosNuMu.data);
+    readDataSet(Kaon_file_id, "/nu_mu_bar/integrated_flux", promptAtmosNuMuBar.data);
 
-  H5Fclose(prompt_file_id);
-}
-
-  void LoadDetectorCorrection(std::string detector_correction_filename){
-  multidim convDOMEffCorrection2010 = alloc_multi(3, histogramDims);
-  multidim convDOMEffCorrection2011 = alloc_multi(3, histogramDims);
-  multidim *convDOMEffCorrection[2] = {&convDOMEffCorrection2010, &convDOMEffCorrection2011};
-
-  // reading the DOM efficiency correction
-  hid_t file_id = H5Fopen(chris_flux_filename.c_str(), H5F_ACC_RDONLY, H5P_DEFAULT);
-  readDataSet(file_id, "/detector_correction/2010", convDOMEffCorrection2010.data);
-  readDataSet(file_id, "/detector_correction/2011", convDOMEffCorrection2011.data);
-}
-
-protected:
-void MakeMCEvents(std::array<double, 3>& osc_params) {
-  if (!quiet) {
-    std::cout << "Calculating simulation weights." << std::endl;
+    H5Fclose(prompt_file_id);
   }
 
-  for (auto it = kaon_event_expectation.begin(); it < kaon_event_expectation.end(); it++)
-    *it = 0.;
-  for (auto it = pion_event_expectation.begin(); it < pion_event_expectation.end(); it++)
-    *it = 0.;
-  for (auto it = prompt_event_expectation.begin(); it < prompt_event_expectation.end(); it++)
-    *it = 0.;
-  for (auto it = astro_event_expectation.begin(); it < astro_event_expectation.end(); it++)
-    *it = 0.;
+  void LoadDetectorCorrection(std::string detector_correction_filename) {
+    multidim convDOMEffCorrection2010 = alloc_multi(3, histogramDims);
+    multidim convDOMEffCorrection2011 = alloc_multi(3, histogramDims);
+    convDOMEffCorrection[2] = {&convDOMEffCorrection2010, &convDOMEffCorrection2011};
 
-  unsigned int indices[3], p, y;
+    // reading the DOM efficiency correction
+    hid_t file_id = H5Fopen(detector_correction_filename.c_str(), H5F_ACC_RDONLY, H5P_DEFAULT);
+    readDataSet(file_id, "/detector_correction/2010", convDOMEffCorrection2010.data);
+    readDataSet(file_id, "/detector_correction/2011", convDOMEffCorrection2011.data);
+  }
+
+protected:
+  void MakeMCEvents(std::array<double, 3> &osc_params) {
+    if (!quiet) {
+      std::cout << "Calculating simulation weights." << std::endl;
+    }
+
+    for (auto it = kaon_event_expectation.begin(); it < kaon_event_expectation.end(); it++)
+      *it = 0.;
+    for (auto it = pion_event_expectation.begin(); it < pion_event_expectation.end(); it++)
+      *it = 0.;
+    for (auto it = prompt_event_expectation.begin(); it < prompt_event_expectation.end(); it++)
+      *it = 0.;
+    for (auto it = astro_event_expectation.begin(); it < astro_event_expectation.end(); it++)
+      *it = 0.;
+
+    unsigned int indices[3], p, y;
 
 #define USE_CHRIS_FLUX
 #ifndef USE_CHRIS_FLUX
-  // read nusquids calculated flux
-  if (!quiet) {
-    std::cout << "Loading nuSQuIDS fluxes." << std::endl;
-  }
-
-  for (PTypes flavor : {NUMU, NUMUBAR}) {
-    for (unsigned int ei = 0; ei < neutrinoEnergyBins; ei++) {
-      for (unsigned int ci = 0; ci < cosZenithBins; ci++) {
-        double p_osc =
-            GetAvgPOsc(ws, osc_params, flavor, edges[y2010][flavor][coszenith_index][ci],
-                       edges[y2010][flavor][coszenith_index][ci + 1],
-                       edges[y2010][flavor][neutrino_energy_index][ei],
-                       edges[y2010][flavor][neutrino_energy_index][ei + 1]);
-        double kaon_integrated_flux =
-            GetAveragedFlux(ws, &nus_kaon, flavor,
-                            edges[y2010][flavor][coszenith_index][ci],
-                            edges[y2010][flavor][coszenith_index][ci + 1],
-                            edges[y2010][flavor][neutrino_energy_index][ei],
-                            edges[y2010][flavor][neutrino_energy_index][ei + 1]) *
-            p_osc;
-        double pion_integrated_flux =
-            GetAveragedFlux(ws, &nus_pion, flavor,
-                            edges[y2010][flavor][coszenith_index][ci],
-                            edges[y2010][flavor][coszenith_index][ci + 1],
-                            edges[y2010][flavor][neutrino_energy_index][ei],
-                            edges[y2010][flavor][neutrino_energy_index][ei + 1]) *
-            p_osc;
-
-        double p_osc_astro =
-            GetAvgAstroPOsc(ws, osc_params, flavor, edges[y2010][flavor][coszenith_index][ci],
-                            edges[y2010][flavor][coszenith_index][ci + 1],
-                            edges[y2010][flavor][neutrino_energy_index][ei],
-                            edges[y2010][flavor][neutrino_energy_index][ei + 1]);
-        double astro_integrated_flux =
-            GetAveragedAstroFlux(ws, flavor, edges[y2010][flavor][coszenith_index][ci],
-                                 edges[y2010][flavor][coszenith_index][ci + 1],
-                                 edges[y2010][flavor][neutrino_energy_index][ei],
-                                 edges[y2010][flavor][neutrino_energy_index][ei + 1]) *
-            p_osc_astro;
-        for (unsigned int pi = 0; pi < energyProxyBins; pi++) {
-          for (Year year : {y2010, y2011}) {
-            indices[0] = ei;
-            indices[1] = ci;
-            indices[2] = pi;
-            p = (flavor == NUMU) ? 0 : 1;
-            y = (year == y2010) ? 0 : 1;
-            double solid_angle =
-                2. * PI_CONSTANT * (edges[year][flavor][coszenith_index][ci + 1] -
-                                    edges[year][flavor][coszenith_index][ci]);
-            double DOM_eff_correction =
-                1.; // this correction is flux dependent, we will need to fix this.
-            // double DOM_eff_correction =*index_multi(*convDOMEffCorrection[y],indices);
-            kaon_event_expectation[year][ci][pi] +=
-                DOM_eff_correction * solid_angle * m2Tocm2 * livetime[year] *
-                areas[year][flavor][ei][ci][pi] * kaon_integrated_flux;
-            pion_event_expectation[year][ci][pi] +=
-                DOM_eff_correction * solid_angle * m2Tocm2 * livetime[year] *
-                areas[year][flavor][ei][ci][pi] * pion_integrated_flux;
-            prompt_event_expectation[year][ci][pi] += 0.; // no nusquids flux yet for prompt
-            astro_event_expectation[year][ci][pi] +=
-                DOM_eff_correction * solid_angle * m2Tocm2 * livetime[year] *
-                areas[year][flavor][ei][ci][pi] * astro_integrated_flux;
-          }
-        }
-      }
+    // read nusquids calculated flux
+    if (!quiet) {
+      std::cout << "Loading nuSQuIDS fluxes." << std::endl;
     }
-  }
-#else
-  for (PTypes flavor : {NUMU, NUMUBAR}) {
-    for (unsigned int ci = 0; ci < cosZenithBins; ci++) {
+
+    for (PTypes flavor : {NUMU, NUMUBAR}) {
       for (unsigned int ei = 0; ei < neutrinoEnergyBins; ei++) {
-        double p_osc =
-            GetAvgPOsc(ws, osc_params, flavor, edges[y2010][flavor][coszenith_index][ci],
-                       edges[y2010][flavor][coszenith_index][ci + 1],
-                       edges[y2010][flavor][neutrino_energy_index][ei],
-                       edges[y2010][flavor][neutrino_energy_index][ei + 1]);
-        double p_osc_astro =
-            GetAvgAstroPOsc(ws, osc_params, flavor, edges[y2010][flavor][coszenith_index][ci],
-                            edges[y2010][flavor][coszenith_index][ci + 1],
-                            edges[y2010][flavor][neutrino_energy_index][ei],
-                            edges[y2010][flavor][neutrino_energy_index][ei + 1]);
-        double astro_integrated_flux =
-            GetAveragedAstroFlux(ws, flavor, edges[y2010][flavor][coszenith_index][ci],
-                                 edges[y2010][flavor][coszenith_index][ci + 1],
-                                 edges[y2010][flavor][neutrino_energy_index][ei],
-                                 edges[y2010][flavor][neutrino_energy_index][ei + 1]) *
-            p_osc_astro;
+        for (unsigned int ci = 0; ci < cosZenithBins; ci++) {
+          double p_osc =
+              GetAvgPOsc(ws.get(), osc_params, flavor, edges[y2010][flavor][coszenith_index][ci],
+                         edges[y2010][flavor][coszenith_index][ci + 1],
+                         edges[y2010][flavor][neutrino_energy_index][ei],
+                         edges[y2010][flavor][neutrino_energy_index][ei + 1]);
+          double kaon_integrated_flux =
+              GetAveragedFlux(ws, &nus_kaon, flavor, edges[y2010][flavor][coszenith_index][ci],
+                              edges[y2010][flavor][coszenith_index][ci + 1],
+                              edges[y2010][flavor][neutrino_energy_index][ei],
+                              edges[y2010][flavor][neutrino_energy_index][ei + 1]) *
+              p_osc;
+          double pion_integrated_flux =
+              GetAveragedFlux(ws, &nus_pion, flavor, edges[y2010][flavor][coszenith_index][ci],
+                              edges[y2010][flavor][coszenith_index][ci + 1],
+                              edges[y2010][flavor][neutrino_energy_index][ei],
+                              edges[y2010][flavor][neutrino_energy_index][ei + 1]) *
+              p_osc;
 
-        for (unsigned int pi = 0; pi < energyProxyBins; pi++) {
-          for (Year year : {y2010, y2011}) {
-            // std::cout << ci << " " << edges[year][flavor][coszenith_index][ci] << std::endl;
-            indices[0] = ei;
-            indices[1] = ci;
-            indices[2] = pi;
-            p = (flavor == NUMU) ? 0 : 1;
-            y = (year == y2010) ? 0 : 1;
-            double solid_angle =
-                2. * PI_CONSTANT * (edges[year][flavor][coszenith_index][ci + 1] -
-                                    edges[year][flavor][coszenith_index][ci]);
-            double pion_fluxIntegral = *index_multi(*convPionAtmosFlux[p], indices);
-            double kaon_fluxIntegral = *index_multi(*convKaonAtmosFlux[p], indices);
-            double prompt_fluxIntegral = *index_multi(*promptAtmosFlux[p], indices);
-            double DOM_eff_correction = *index_multi(*convDOMEffCorrection[y], indices);
-            // chris does not separate between pions and kaon components. Lets just drop it all in
-            // the kaons.
-            // also chris has already included the solid angle factor in the flux
-            kaon_event_expectation[year][ci][pi] += m2Tocm2 * livetime[year] *
-                                                    areas[year][flavor][ei][ci][pi] *
-                                                    DOM_eff_correction * kaon_fluxIntegral * p_osc;
-            pion_event_expectation[year][ci][pi] += m2Tocm2 * livetime[year] *
-                                                    areas[year][flavor][ei][ci][pi] *
-                                                    DOM_eff_correction * pion_fluxIntegral * p_osc;
-            prompt_event_expectation[year][ci][pi] +=
-                m2Tocm2 * livetime[year] * areas[year][flavor][ei][ci][pi] *
-                DOM_eff_correction * prompt_fluxIntegral * p_osc;
-            astro_event_expectation[year][ci][pi] +=
-                DOM_eff_correction * solid_angle * m2Tocm2 * livetime[year] *
-                ws.areas[year][flavor][ei][ci][pi] * astro_integrated_flux;
-            if (kaon_event_expectation[year][ci][pi] < 0)
-              throw std::runtime_error("badness");
+          double p_osc_astro =
+              GetAvgAstroPOsc(ws, osc_params, flavor, edges[y2010][flavor][coszenith_index][ci],
+                              edges[y2010][flavor][coszenith_index][ci + 1],
+                              edges[y2010][flavor][neutrino_energy_index][ei],
+                              edges[y2010][flavor][neutrino_energy_index][ei + 1]);
+          double astro_integrated_flux =
+              GetAveragedAstroFlux(ws, flavor, edges[y2010][flavor][coszenith_index][ci],
+                                   edges[y2010][flavor][coszenith_index][ci + 1],
+                                   edges[y2010][flavor][neutrino_energy_index][ei],
+                                   edges[y2010][flavor][neutrino_energy_index][ei + 1]) *
+              p_osc_astro;
+          for (unsigned int pi = 0; pi < energyProxyBins; pi++) {
+            for (Year year : {y2010, y2011}) {
+              indices[0] = ei;
+              indices[1] = ci;
+              indices[2] = pi;
+              p = (flavor == NUMU) ? 0 : 1;
+              y = (year == y2010) ? 0 : 1;
+              double solid_angle =
+                  2. * PI_CONSTANT * (edges[year][flavor][coszenith_index][ci + 1] -
+                                      edges[year][flavor][coszenith_index][ci]);
+              double DOM_eff_correction =
+                  1.; // this correction is flux dependent, we will need to fix this.
+              // double DOM_eff_correction =*index_multi(*convDOMEffCorrection[y],indices);
+              kaon_event_expectation[year][ci][pi] +=
+                  DOM_eff_correction * solid_angle * m2Tocm2 * livetime[year] *
+                  areas[year][flavor][ei][ci][pi] * kaon_integrated_flux;
+              pion_event_expectation[year][ci][pi] +=
+                  DOM_eff_correction * solid_angle * m2Tocm2 * livetime[year] *
+                  areas[year][flavor][ei][ci][pi] * pion_integrated_flux;
+              prompt_event_expectation[year][ci][pi] += 0.; // no nusquids flux yet for prompt
+              astro_event_expectation[year][ci][pi] +=
+                  DOM_eff_correction * solid_angle * m2Tocm2 * livetime[year] *
+                  areas[year][flavor][ei][ci][pi] * astro_integrated_flux;
+            }
           }
         }
       }
     }
-  }
+#else
+    for (PTypes flavor : {NUMU, NUMUBAR}) {
+      for (unsigned int ci = 0; ci < cosZenithBins; ci++) {
+        for (unsigned int ei = 0; ei < neutrinoEnergyBins; ei++) {
+          double p_osc =
+              GetAvgPOsc(ws, osc_params, flavor, edges[y2010][flavor][coszenith_index][ci],
+                         edges[y2010][flavor][coszenith_index][ci + 1],
+                         edges[y2010][flavor][neutrino_energy_index][ei],
+                         edges[y2010][flavor][neutrino_energy_index][ei + 1]);
+          double p_osc_astro =
+              GetAvgAstroPOsc(ws, osc_params, flavor, edges[y2010][flavor][coszenith_index][ci],
+                              edges[y2010][flavor][coszenith_index][ci + 1],
+                              edges[y2010][flavor][neutrino_energy_index][ei],
+                              edges[y2010][flavor][neutrino_energy_index][ei + 1]);
+          double astro_integrated_flux =
+              GetAveragedAstroFlux(ws, flavor, edges[y2010][flavor][coszenith_index][ci],
+                                   edges[y2010][flavor][coszenith_index][ci + 1],
+                                   edges[y2010][flavor][neutrino_energy_index][ei],
+                                   edges[y2010][flavor][neutrino_energy_index][ei + 1]) *
+              p_osc_astro;
+
+          for (unsigned int pi = 0; pi < energyProxyBins; pi++) {
+            for (Year year : {y2010, y2011}) {
+              // std::cout << ci << " " << edges[year][flavor][coszenith_index][ci] << std::endl;
+              indices[0] = ei;
+              indices[1] = ci;
+              indices[2] = pi;
+              p = (flavor == NUMU) ? 0 : 1;
+              y = (year == y2010) ? 0 : 1;
+              double solid_angle =
+                  2. * PI_CONSTANT * (edges[year][flavor][coszenith_index][ci + 1] -
+                                      edges[year][flavor][coszenith_index][ci]);
+              double pion_fluxIntegral = *index_multi(*convPionAtmosFlux[p], indices);
+              double kaon_fluxIntegral = *index_multi(*convKaonAtmosFlux[p], indices);
+              double prompt_fluxIntegral = *index_multi(*promptAtmosFlux[p], indices);
+              double DOM_eff_correction = *index_multi(*convDOMEffCorrection[y], indices);
+              // chris does not separate between pions and kaon components. Lets just drop it all in
+              // the kaons.
+              // also chris has already included the solid angle factor in the flux
+              kaon_event_expectation[year][ci][pi] +=
+                  m2Tocm2 * livetime[year] * areas[year][flavor][ei][ci][pi] * DOM_eff_correction *
+                  kaon_fluxIntegral * p_osc;
+              pion_event_expectation[year][ci][pi] +=
+                  m2Tocm2 * livetime[year] * areas[year][flavor][ei][ci][pi] * DOM_eff_correction *
+                  pion_fluxIntegral * p_osc;
+              prompt_event_expectation[year][ci][pi] +=
+                  m2Tocm2 * livetime[year] * areas[year][flavor][ei][ci][pi] * DOM_eff_correction *
+                  prompt_fluxIntegral * p_osc;
+              astro_event_expectation[year][ci][pi] +=
+                  DOM_eff_correction * solid_angle * m2Tocm2 * livetime[year] *
+                  areas[year][flavor][ei][ci][pi] * astro_integrated_flux;
+              if (kaon_event_expectation[year][ci][pi] < 0)
+                throw std::runtime_error("badness");
+            }
+          }
+        }
+      }
+    }
 #endif
 
-  // to keep the code simple we are going to construct fake MC events
-  // which weights are just the expectation value. The advantage of this is that
-  // when we have the actual IceCube MC the following code can be reused. Love, CA.
+    // to keep the code simple we are going to construct fake MC events
+    // which weights are just the expectation value. The advantage of this is that
+    // when we have the actual IceCube MC the following code can be reused. Love, CA.
 
-  if (!quiet) {
-    std::cout << "Making simulation events." << std::endl;
-  }
-  mc_events.clear();
-  for (Year year : {y2010, y2011}) {
-    for (unsigned int ci = 0; ci < cosZenithBins; ci++) {
-      for (unsigned int pi = 0; pi < energyProxyBins; pi++) {
-        // we are going to save the bin content and label it at the bin center
-        mc_events.push_back(Event((edges[year][flavor][proxy_energy_index][pi] +
-                                   edges[year][flavor][proxy_energy_index][pi + 1]) /
-                                      2., // energy proxy bin center
-                                  (edges[year][flavor][coszenith_index][ci] +
-                                   edges[year][flavor][coszenith_index][ci + 1]) /
-                                      2.,                                  // costh bin center
-                                  year == y2010 ? 2010 : 2011,             // year
-                                  kaon_event_expectation[year][ci][pi],    // amount of kaon
-                                                                           // component events
-                                  pion_event_expectation[year][ci][pi],    // amount of pion
-                                                                           // component events
-                                  prompt_event_expectation[year][ci][pi],  // amount of prompt
-                                                                           // component events
-                                  astro_event_expectation[year][ci][pi])); // amount of
-                                                                           // astrophysical
-                                                                           // component events
+    if (!quiet) {
+      std::cout << "Making simulation events." << std::endl;
+    }
+    mc_events.clear();
+    for (Year year : {y2010, y2011}) {
+      for (unsigned int ci = 0; ci < cosZenithBins; ci++) {
+        for (unsigned int pi = 0; pi < energyProxyBins; pi++) {
+          // we are going to save the bin content and label it at the bin center
+          mc_events.push_back(Event((edges[year][flavor][proxy_energy_index][pi] +
+                                     edges[year][flavor][proxy_energy_index][pi + 1]) /
+                                        2., // energy proxy bin center
+                                    (edges[year][flavor][coszenith_index][ci] +
+                                     edges[year][flavor][coszenith_index][ci + 1]) /
+                                        2.,                                  // costh bin center
+                                    year == y2010 ? 2010 : 2011,             // year
+                                    kaon_event_expectation[year][ci][pi],    // amount of kaon
+                                                                             // component events
+                                    pion_event_expectation[year][ci][pi],    // amount of pion
+                                                                             // component events
+                                    prompt_event_expectation[year][ci][pi],  // amount of prompt
+                                                                             // component events
+                                    astro_event_expectation[year][ci][pi])); // amount of
+                                                                             // astrophysical
+                                                                             // component events
+        }
       }
     }
   }
-}
 
-void MakeSimulationHistogram(std::array<double, 3>& osc_params) {
-  if (!quiet) {
-    std::cout << "Constructing simulation histogram." << std::endl;
+  void MakeSimulationHistogram(std::array<double, 3> &osc_params) {
+    if (!quiet) {
+      std::cout << "Constructing simulation histogram." << std::endl;
+    }
+    // create fake events according to hypothesis
+    MakeMCEvents(osc_params);
+    // create MC histogram with the same binning as the data
+    HistType sim_hist = makeEmptyHistogramCopy(data_hist);
+    // fill in the histogram with the mc events
+    bin(mc_events, sim_hist, binner);
   }
-  // create fake events according to hypothesis
-  MakeMCEvents(osc_params);
-  // create MC histogram with the same binning as the data
-  HistType sim_hist = makeEmptyHistogramCopy(data_hist);
-  // fill in the histogram with the mc events
-  bin(mc_events, sim_hist, binner);
-}
 
 public:
-fitResult llh(std::array<double, 3>& osc_params) {
-  MakeSimulationHistogram(osc_params);
+  fitResult llh(std::array<double, 3> &osc_params) {
+    MakeSimulationHistogram(osc_params);
 
-  if (!quiet) {
-    std::cout << "Defining priors." << std::endl;
-  }
-  // here we define the priors
-  likelihood::UniformPrior positivePrior(0.0, std::numeric_limits<double>::infinity());
-  likelihood::GaussianPrior normalizationPrior(1., 0.4); // 0.4
-  likelihood::GaussianPrior crSlopePrior(0.0, 0.05);
-  likelihood::GaussianPrior kaonPrior(1.0, 0.1);
-  likelihood::UniformPrior prompt_norm(0.0, std::numeric_limits<double>::infinity());
-  likelihood::UniformPrior astro_norm(0.0, std::numeric_limits<double>::infinity());
-  likelihood::UniformPrior astro_gamma(-0.5, 0.5);
+    if (!quiet) {
+      std::cout << "Defining priors." << std::endl;
+    }
+    // here we define the priors
+    likelihood::UniformPrior positivePrior(0.0, std::numeric_limits<double>::infinity());
+    likelihood::GaussianPrior normalizationPrior(1., 0.4); // 0.4
+    likelihood::GaussianPrior crSlopePrior(0.0, 0.05);
+    likelihood::GaussianPrior kaonPrior(1.0, 0.1);
+    likelihood::UniformPrior prompt_norm(0.0, std::numeric_limits<double>::infinity());
+    likelihood::UniformPrior astro_norm(0.0, std::numeric_limits<double>::infinity());
+    likelihood::UniformPrior astro_gamma(-0.5, 0.5);
 
-  auto priors = makePriorSet(normalizationPrior, crSlopePrior, kaonPrior, prompt_norm, astro_norm,
-                             astro_gamma);
-  // construct a MC event reweighter
-  DiffuseFitWeighterMaker DFWM;
-  if (!quiet) {
-    std::cout << "Constructing likelihood problem." << std::endl;
-  }
-  // construct likelihood problem
-  // there are two numbers here. The first number is the number of histogram
-  // dimension, in this case 3.
-  // The second number is the number of nuisance parameters, it is 3 for
-  // conventional-only,
-  // and 5 for conventional+astro, and 6 for conventional+astro+prompt.
-  auto prob = likelihood::makeLikelihoodProblem<std::reference_wrapper<const Event>, 3, 6>(
-      data_hist, {sim_hist}, priors, {1.0}, likelihood::simpleDataWeighter(), DFWM,
-      likelihood::poissonLikelihood(), fitSeed);
-  prob.setEvaluationThreadCount(evalThreads);
+    auto priors = makePriorSet(normalizationPrior, crSlopePrior, kaonPrior, prompt_norm, astro_norm,
+                               astro_gamma);
+    // construct a MC event reweighter
+    DiffuseFitWeighterMaker DFWM;
+    if (!quiet) {
+      std::cout << "Constructing likelihood problem." << std::endl;
+    }
+    // construct likelihood problem
+    // there are two numbers here. The first number is the number of histogram
+    // dimension, in this case 3.
+    // The second number is the number of nuisance parameters, it is 3 for
+    // conventional-only,
+    // and 5 for conventional+astro, and 6 for conventional+astro+prompt.
+    auto prob = likelihood::makeLikelihoodProblem<std::reference_wrapper<const Event>, 3, 6>(
+        data_hist, {sim_hist}, priors, {1.0}, likelihood::simpleDataWeighter(), DFWM,
+        likelihood::poissonLikelihood(), fitSeed);
+    prob.setEvaluationThreadCount(evalThreads);
 
-  std::vector<double> seed = prob.getSeed();
-  std::vector<unsigned int> fixedIndices = {}; // nuisance parameters that will be fixed
-  paramFixSpec fixedParams;
-  for (const auto pf : fixedParams.params) {
-    if (!quiet)
-      std::cout << "Fitting with parameter " << pf.first << " fixed to " << pf.second << std::endl;
-    seed[pf.first] = pf.second;
-    fixedIndices.push_back(pf.first);
+    std::vector<double> seed = prob.getSeed();
+    std::vector<unsigned int> fixedIndices = {}; // nuisance parameters that will be fixed
+    paramFixSpec fixedParams;
+    for (const auto pf : fixedParams.params) {
+      if (!quiet)
+        std::cout << "Fitting with parameter " << pf.first << " fixed to " << pf.second
+                  << std::endl;
+      seed[pf.first] = pf.second;
+      fixedIndices.push_back(pf.first);
+    }
+    if (!quiet) {
+      std::cout << "Finding minima." << std::endl;
+    }
+    // minimize over the nuisance parameters
+    fitResult fr = doFitLBFGSB(prob, seed, fixedIndices);
+    return fr;
   }
-  if (!quiet) {
-    std::cout << "Finding minima." << std::endl;
-  }
-  // minimize over the nuisance parameters
-  fitResult fr = doFitLBFGSB(prob, seed, fixedIndices);
-  return fr;
-}
-}
+};
 
 #endif

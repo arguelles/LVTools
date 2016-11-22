@@ -29,7 +29,7 @@ int main(int argc, char** argv)
     LVSearch lv_search(effective_area_filename,data_filename,chris_flux_filename,kaon_filename,pion_filename,prompt_filename);
 
     std::array<double, 3> osc_params = {atof(argv[7]),atof(argv[8]),atof(argv[9])};
-    std::cout << lv_search(osc_params) << std::endl;
+    std::cout << lv_search.llh(osc_params).likelihood << std::endl;
 
     return 0;
 }

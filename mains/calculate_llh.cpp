@@ -1,6 +1,3 @@
-#ifndef LV_SEARCH_H_INCLUDED
-#define LV_SEARCH_H_INCLUDED
-
 #include <vector>
 #include <iostream>
 #include <nuSQuIDS/nuSQuIDS.h>
