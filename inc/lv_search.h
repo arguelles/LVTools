@@ -374,7 +374,7 @@ protected:
     if (!quiet)
       std::cout << "Histograming data." << std::endl;
     // this magic number set the right bin edges
-    data_hist(LogarithmicAxis(0, 0.1), LinearAxis(0, 0.1), LinearAxis(2010, 1));
+    data_hist = HistType(LogarithmicAxis(0, 0.1), LinearAxis(0, 0.1), LinearAxis(2010, 1));
 
     data_hist.getAxis(0)->setLowerLimit(minFitEnergy);
     data_hist.getAxis(0)->setUpperLimit(maxFitEnergy);
@@ -400,7 +400,8 @@ protected:
 
     multidim convPionAtmosNuMu = alloc_multi(2, histogramDims);
     multidim convPionAtmosNuMuBar = alloc_multi(2, histogramDims);
-    convPionAtmosFlux[2] = {&convPionAtmosNuMu, &convPionAtmosNuMuBar};
+    convPionAtmosFlux[0] = &convPionAtmosNuMu;
+    convPionAtmosFlux[1] =  &convPionAtmosNuMuBar;
 
     readDataSet(pion_file_id, "/nu_mu/integrated_flux", convPionAtmosNuMu.data);
     readDataSet(pion_file_id, "/nu_mu_bar/integrated_flux", convPionAtmosNuMuBar.data);
@@ -412,7 +413,8 @@ protected:
 
     multidim convKaonAtmosNuMu = alloc_multi(2, histogramDims);
     multidim convKaonAtmosNuMuBar = alloc_multi(2, histogramDims);
-    convKaonAtmosFlux[2] = {&convKaonAtmosNuMu, &convKaonAtmosNuMuBar};
+    convKaonAtmosFlux[0] = &convKaonAtmosNuMu;
+    convKaonAtmosFlux[1] = &convKaonAtmosNuMuBar;
 
     readDataSet(Kaon_file_id, "/nu_mu/integrated_flux", convKaonAtmosNuMu.data);
     readDataSet(Kaon_file_id, "/nu_mu_bar/integrated_flux", convKaonAtmosNuMuBar.data);
@@ -424,7 +426,8 @@ protected:
 
     multidim promptAtmosNuMu = alloc_multi(2, histogramDims);
     multidim promptAtmosNuMuBar = alloc_multi(2, histogramDims);
-    promptAtmosFlux[2] = {&promptAtmosNuMu, &promptAtmosNuMuBar};
+    promptAtmosFlux[0] = &promptAtmosNuMu;
+    promptAtmosFlux[1] = &promptAtmosNuMuBar;
 
     readDataSet(Kaon_file_id, "/nu_mu/integrated_flux", promptAtmosNuMu.data);
     readDataSet(Kaon_file_id, "/nu_mu_bar/integrated_flux", promptAtmosNuMuBar.data);
@@ -435,7 +438,8 @@ protected:
   void LoadDetectorCorrection(std::string detector_correction_filename) {
     multidim convDOMEffCorrection2010 = alloc_multi(3, histogramDims);
     multidim convDOMEffCorrection2011 = alloc_multi(3, histogramDims);
-    convDOMEffCorrection[2] = {&convDOMEffCorrection2010, &convDOMEffCorrection2011};
+    convDOMEffCorrection[0] = &convDOMEffCorrection2010;
+    convDOMEffCorrection[1] = &convDOMEffCorrection2011;
 
     // reading the DOM efficiency correction
     hid_t file_id = H5Fopen(detector_correction_filename.c_str(), H5F_ACC_RDONLY, H5P_DEFAULT);
