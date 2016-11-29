@@ -318,11 +318,11 @@ protected:
   nuSQUIDSAtm<nuSQUIDSLV> *nus_pion;
   nuSQUIDSAtm<nuSQUIDSLV> *nus_prompt;
   // prebinned fluxes
-  multidim **convPionAtmosFlux;
-  multidim **convKaonAtmosFlux;
-  multidim **promptAtmosFlux;
+  multidim convPionAtmosFlux[2];
+  multidim convKaonAtmosFlux[2];
+  multidim promptAtmosFlux[2];
   // DOM efficiency correction
-  multidim **convDOMEffCorrection;
+  multidim convDOMEffCorrection[2];
   // Simulation histogram
   HistType sim_hist;
   // Simulation events
@@ -351,6 +351,18 @@ public:
         std::vector<size_t>{number_of_years, cosZenithBins, energyProxyBins});
     astro_event_expectation.resize(
         std::vector<size_t>{number_of_years, cosZenithBins, energyProxyBins});
+
+    convPionAtmosFlux[0] = alloc_multi(2,histogramDims);
+    convPionAtmosFlux[1] = alloc_multi(2,histogramDims);
+
+    convKaonAtmosFlux[0] = alloc_multi(2,histogramDims);
+    convKaonAtmosFlux[1] = alloc_multi(2,histogramDims);
+
+    promptAtmosFlux[0] = alloc_multi(2,histogramDims);
+    promptAtmosFlux[1] = alloc_multi(2,histogramDims);
+
+    convDOMEffCorrection[0] = alloc_multi(3,histogramDims);
+    convDOMEffCorrection[1] = alloc_multi(3,histogramDims);
 
     LoadData(data_filename);
     LoadEffectiveArea(effective_area_filename);
@@ -398,53 +410,34 @@ protected:
     // reading pion flux
     hid_t pion_file_id = H5Fopen(pion_filename.c_str(), H5F_ACC_RDONLY, H5P_DEFAULT);
 
-    multidim convPionAtmosNuMu = alloc_multi(2, histogramDims);
-    multidim convPionAtmosNuMuBar = alloc_multi(2, histogramDims);
-    convPionAtmosFlux[0] = &convPionAtmosNuMu;
-    convPionAtmosFlux[1] =  &convPionAtmosNuMuBar;
-
-    readDataSet(pion_file_id, "/nu_mu/integrated_flux", convPionAtmosNuMu.data);
-    readDataSet(pion_file_id, "/nu_mu_bar/integrated_flux", convPionAtmosNuMuBar.data);
+    readDataSet(pion_file_id, "/nu_mu/integrated_flux", convPionAtmosFlux[0].data);
+    readDataSet(pion_file_id, "/nu_mu_bar/integrated_flux", convPionAtmosFlux[1].data);
 
     H5Fclose(pion_file_id);
 
     // reading kaon flux
     hid_t Kaon_file_id = H5Fopen(kaon_filename.c_str(), H5F_ACC_RDONLY, H5P_DEFAULT);
 
-    multidim convKaonAtmosNuMu = alloc_multi(2, histogramDims);
-    multidim convKaonAtmosNuMuBar = alloc_multi(2, histogramDims);
-    convKaonAtmosFlux[0] = &convKaonAtmosNuMu;
-    convKaonAtmosFlux[1] = &convKaonAtmosNuMuBar;
-
-    readDataSet(Kaon_file_id, "/nu_mu/integrated_flux", convKaonAtmosNuMu.data);
-    readDataSet(Kaon_file_id, "/nu_mu_bar/integrated_flux", convKaonAtmosNuMuBar.data);
+    readDataSet(Kaon_file_id, "/nu_mu/integrated_flux", convKaonAtmosFlux[0].data);
+    readDataSet(Kaon_file_id, "/nu_mu_bar/integrated_flux", convKaonAtmosFlux[1].data);
 
     H5Fclose(Kaon_file_id);
 
     // reading prompt flux
     hid_t prompt_file_id = H5Fopen(prompt_filename.c_str(), H5F_ACC_RDONLY, H5P_DEFAULT);
 
-    multidim promptAtmosNuMu = alloc_multi(2, histogramDims);
-    multidim promptAtmosNuMuBar = alloc_multi(2, histogramDims);
-    promptAtmosFlux[0] = &promptAtmosNuMu;
-    promptAtmosFlux[1] = &promptAtmosNuMuBar;
-
-    readDataSet(Kaon_file_id, "/nu_mu/integrated_flux", promptAtmosNuMu.data);
-    readDataSet(Kaon_file_id, "/nu_mu_bar/integrated_flux", promptAtmosNuMuBar.data);
+    readDataSet(Kaon_file_id, "/nu_mu/integrated_flux", promptAtmosFlux[0].data);
+    readDataSet(Kaon_file_id, "/nu_mu_bar/integrated_flux", promptAtmosFlux[1].data);
 
     H5Fclose(prompt_file_id);
   }
 
   void LoadDetectorCorrection(std::string detector_correction_filename) {
-    multidim convDOMEffCorrection2010 = alloc_multi(3, histogramDims);
-    multidim convDOMEffCorrection2011 = alloc_multi(3, histogramDims);
-    convDOMEffCorrection[0] = &convDOMEffCorrection2010;
-    convDOMEffCorrection[1] = &convDOMEffCorrection2011;
 
     // reading the DOM efficiency correction
     hid_t file_id = H5Fopen(detector_correction_filename.c_str(), H5F_ACC_RDONLY, H5P_DEFAULT);
-    readDataSet(file_id, "/detector_correction/2010", convDOMEffCorrection2010.data);
-    readDataSet(file_id, "/detector_correction/2011", convDOMEffCorrection2011.data);
+    readDataSet(file_id, "/detector_correction/2010", convDOMEffCorrection[0].data);
+    readDataSet(file_id, "/detector_correction/2011", convDOMEffCorrection[1].data);
   }
 
 protected:
@@ -464,6 +457,7 @@ protected:
 
     unsigned int indices[3], p, y;
 
+    std::cout << "eme aqui 1" << std::endl;
 #define USE_CHRIS_FLUX
 #ifndef USE_CHRIS_FLUX
     // read nusquids calculated flux
@@ -563,10 +557,10 @@ protected:
               double solid_angle =
                   2. * PI_CONSTANT * (edges[year][flavor][coszenith_index][ci + 1] -
                                       edges[year][flavor][coszenith_index][ci]);
-              double pion_fluxIntegral = *index_multi(*convPionAtmosFlux[p], indices);
-              double kaon_fluxIntegral = *index_multi(*convKaonAtmosFlux[p], indices);
-              double prompt_fluxIntegral = *index_multi(*promptAtmosFlux[p], indices);
-              double DOM_eff_correction = *index_multi(*convDOMEffCorrection[y], indices);
+              double pion_fluxIntegral = *index_multi(convPionAtmosFlux[p], indices);
+              double kaon_fluxIntegral = *index_multi(convKaonAtmosFlux[p], indices);
+              double prompt_fluxIntegral = *index_multi(promptAtmosFlux[p], indices);
+              double DOM_eff_correction = *index_multi(convDOMEffCorrection[y], indices);
               // chris does not separate between pions and kaon components. Lets just drop it all in
               // the kaons.
               // also chris has already included the solid angle factor in the flux
@@ -631,7 +625,7 @@ protected:
     // create fake events according to hypothesis
     MakeMCEvents(osc_params);
     // create MC histogram with the same binning as the data
-    HistType sim_hist = makeEmptyHistogramCopy(data_hist);
+    sim_hist = makeEmptyHistogramCopy(data_hist);
     // fill in the histogram with the mc events
     bin(mc_events, sim_hist, binner);
   }
