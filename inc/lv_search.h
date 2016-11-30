@@ -281,7 +281,7 @@ void bin(const ContainerType& data, HistType& hist, const BinnerType& binner){
 
 class LVSearch {
 private:
-  bool quiet = false;
+  bool quiet = true;
   const double PI_CONSTANT = 3.141592;
   const double m2Tocm2 = 1.0e4;
 
@@ -370,7 +370,7 @@ public:
     LoadDetectorCorrection(detector_correction_filename);
   }
 
-  void SetVerbose(bool quietness) { quiet = quietness; }
+  void SetVerbose(bool quietness) { quiet = !quietness; }
 
 protected:
   void LoadData(std::string data_filename) {
@@ -457,7 +457,6 @@ protected:
 
     unsigned int indices[3], p, y;
 
-    std::cout << "eme aqui 1" << std::endl;
 #define USE_CHRIS_FLUX
 #ifndef USE_CHRIS_FLUX
     // read nusquids calculated flux
@@ -631,6 +630,9 @@ protected:
   }
 
 public:
+  fitResult llhFull(std::array<double, 9> & params){
+
+  }
   fitResult llh(std::array<double, 3> &osc_params) {
     MakeSimulationHistogram(osc_params);
 
