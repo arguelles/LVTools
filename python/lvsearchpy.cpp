@@ -26,7 +26,7 @@ struct VecToList
 
 // lvsearchpy module definitions
 
-static std::vector<double>  wrap_llh(LVSearch* lv,std::vector<double> arg){
+static std::vector<double> wrap_llh(LVSearch* lv,std::vector<double> arg){
   if(arg.size() != 3)
     throw std::runtime_error("Number of arguments should be 3. You sent me " + std::to_string(arg.size()));
   std::array<double,3> argv;
@@ -37,6 +37,15 @@ static std::vector<double>  wrap_llh(LVSearch* lv,std::vector<double> arg){
   return result;
 }
 
+static double wrap_llhFull(LVSearch* lv,std::vector<double> arg){
+  if(arg.size() != 9)
+    throw std::runtime_error("Number of arguments should be 3. You sent me " + std::to_string(arg.size()));
+  std::array<double,9> argv;
+  std::copy_n(arg.begin(),9,argv.begin());
+  double llh = lv->llhFull(argv);
+  return llh;
+}
+
 BOOST_PYTHON_MODULE(lvsearchpy)
 {
   // import numpy array definitions
@@ -45,6 +54,7 @@ BOOST_PYTHON_MODULE(lvsearchpy)
 
   class_<LVSearch, boost::noncopyable, std::shared_ptr<LVSearch> >("LVSearch", init<std::string,std::string,std::string,std::string,std::string,std::string>())
     .def("llh",wrap_llh)
+    .def("llhFull",wrap_llhFull)
     .def("SetVerbose",&LVSearch::SetVerbose)
     ;
 

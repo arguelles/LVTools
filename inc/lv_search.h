@@ -630,9 +630,43 @@ protected:
   }
 
 public:
-  fitResult llhFull(std::array<double, 9> & params){
+  double llhFull(std::array<double, 9> & params){
+    // get physics parameters
+    std::array<double,3> osc_params {params[6],params[7],params[8]};
+    MakeSimulationHistogram(osc_params);
+    // get nuisance parameters
+    std::vector<double> nuisance {params[0],params[1],params[2],params[3],params[4],params[5]};
 
+    if (!quiet) {
+      std::cout << "Defining priors." << std::endl;
+    }
+    // here we define the priors
+    likelihood::UniformPrior positivePrior(0.0, std::numeric_limits<double>::infinity());
+    likelihood::GaussianPrior normalizationPrior(1., 0.4); // 0.4
+    likelihood::GaussianPrior crSlopePrior(0.0, 0.05);
+    likelihood::GaussianPrior kaonPrior(1.0, 0.1);
+    likelihood::UniformPrior prompt_norm(0.0, std::numeric_limits<double>::infinity());
+    likelihood::UniformPrior astro_norm(0.0, std::numeric_limits<double>::infinity());
+    likelihood::UniformPrior astro_gamma(-0.5, 0.5);
+
+    auto priors = makePriorSet(normalizationPrior, crSlopePrior, kaonPrior, prompt_norm, astro_norm,
+                               astro_gamma);
+    // construct a MC event reweighter
+    DiffuseFitWeighterMaker DFWM;
+    // construct likelihood problem
+    // there are two numbers here. The first number is the number of histogram
+    // dimension, in this case 3.
+    // The second number is the number of nuisance parameters, it is 3 for
+    // conventional-only,
+    // and 5 for conventional+astro, and 6 for conventional+astro+prompt.
+    auto prob = likelihood::makeLikelihoodProblem<std::reference_wrapper<const Event>, 3, 6>(
+        data_hist, {sim_hist}, priors, {1.0}, likelihood::simpleDataWeighter(), DFWM,
+        likelihood::poissonLikelihood(), fitSeed);
+    prob.setEvaluationThreadCount(evalThreads);
+
+    return -prob.evaluateLikelihood(nuisance);
   }
+
   fitResult llh(std::array<double, 3> &osc_params) {
     MakeSimulationHistogram(osc_params);
 
