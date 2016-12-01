@@ -336,8 +336,8 @@ protected:
 public:
   LVSearch(std::string effective_area_filename, std::string data_filename,
            std::string detector_correction_filename, std::string kaon_filename,
-           std::string pion_filename, std::string prompt_filename):
-    ws(IntegrateWorkspace(5000))
+           std::string pion_filename, std::string prompt_filename, bool quiet = true):
+    ws(IntegrateWorkspace(5000)),quiet(quiet)
    {
 
     livetime[y2010] = 2.7282e+07;  // in seconds
@@ -395,6 +395,19 @@ protected:
 
     // fill in the histogram with the data
     bin(observed_events, data_hist, binner);
+
+    size_t fill_bins = data_hist.getBinCount(0)*data_hist.getBinCount(1)*data_hist.getBinCount(2);
+    size_t event_number = 0;
+    for(auto it=data_hist.begin(); it!= data_hist.end(); it++){
+      auto itc=static_cast<likelihood::entryStoringBin<std::reference_wrapper<const Event>>>(*it);
+      event_number+=itc.size();
+    }
+
+    if(fill_bins == 0)
+      throw std::runtime_error("No events loaded. Are you sure you are using the right event file/format?");
+
+    if (!quiet)
+      std::cout << "Data histogram has " << fill_bins << " bins filled. " << event_number << " events were loaded." << std::endl;
   }
 
   void LoadEffectiveArea(std::string effective_area_filename) {
@@ -630,6 +643,29 @@ protected:
   }
 
 public:
+  marray<double,3> GetDataDistribution(){
+
+    marray<double,3> array {static_cast<size_t>(data_hist.getBinCount(2)),
+                            static_cast<size_t>(data_hist.getBinCount(1)),
+                            static_cast<size_t>(data_hist.getBinCount(0))};
+
+    for(size_t iy=0; iy<data_hist.getBinCount(2); iy++){ // year
+      for(size_t ic=0; ic<data_hist.getBinCount(1); ic++){ // zenith
+        for(size_t ie=0; ie<data_hist.getBinCount(0); ie++){ // energy
+          auto itc = static_cast<likelihood::entryStoringBin<std::reference_wrapper<const Event>>>(data_hist(ie,ic,iy));
+          array[iy][ic][ie] = itc.size();
+        }
+      }
+    }
+    return array;
+  }
+
+  /*
+  marray<double,3> GetExpectationDistribution(std::aray<double, 9> & params){
+
+  }
+  */
+
   double llhFull(std::array<double, 9> & params){
     // get physics parameters
     std::array<double,3> osc_params {params[6],params[7],params[8]};
