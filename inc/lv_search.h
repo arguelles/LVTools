@@ -660,11 +660,34 @@ public:
     return array;
   }
 
-  /*
-  marray<double,3> GetExpectationDistribution(std::aray<double, 9> & params){
+  marray<double,3> GetExpectationDistribution(std::array<double, 9> & params){
 
+    // get physics parameters
+    std::array<double,3> osc_params {params[6],params[7],params[8]};
+    MakeSimulationHistogram(osc_params);
+    // get nuisance parameters
+    std::vector<double> nuisance {params[0],params[1],params[2],params[3],params[4],params[5]};
+
+    marray<double,3> array {static_cast<size_t>(sim_hist.getBinCount(2)),
+                            static_cast<size_t>(sim_hist.getBinCount(1)),
+                            static_cast<size_t>(sim_hist.getBinCount(0))};
+
+    DiffuseFitWeighterMaker DFWM;
+    auto weighter = DFWM(nuisance);
+    for(size_t iy=0; iy<sim_hist.getBinCount(2); iy++){ // year
+      for(size_t ic=0; ic<sim_hist.getBinCount(1); ic++){ // zenith
+        for(size_t ie=0; ie<sim_hist.getBinCount(0); ie++){ // energy
+          auto itc = static_cast<likelihood::entryStoringBin<std::reference_wrapper<const Event>>>(sim_hist(ie,ic,iy));
+          double expectation=0;
+          for(auto event : itc.entries()){
+            expectation+=weighter(event);
+          }
+          array[iy][ic][ie] = expectation;
+        }
+      }
+    }
+    return array;
   }
-  */
 
   double llhFull(std::array<double, 9> & params){
     // get physics parameters

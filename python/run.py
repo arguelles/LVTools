@@ -1,6 +1,4 @@
 import numpy as np
-import subprocess
-import emcee
 import lvsearchpy as lv
 
 # paths
@@ -34,5 +32,6 @@ def lnprob(theta):
 	return lp + llhCPP(theta)
 
 p0_base = [-28,-28,-28]
+print lvsearch.llh(np.power(10.,p0_base))
 print lnprob(p0_base)
 

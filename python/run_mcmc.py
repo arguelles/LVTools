@@ -20,7 +20,7 @@ lvsearch.SetVerbose(False)
 #calculate likelihood from c++
 def llhCPP(theta):
     output=lvsearch.llh(np.power(10.,theta))
-    return output[-1]
+    return -output[-1]
  
 def lnprior(theta):
     logRCmutau, logICmutau, logCmumu = theta
@@ -46,9 +46,9 @@ p0 = [p0_base + np.random.rand(ndim) for i in range(nwalkers)]
 
 sampler = emcee.EnsembleSampler(nwalkers, ndim, lnprob)
 print("Running burn-in")
-pos, prob, state = sampler.run_mcmc(p0, 10)
+pos, prob, state = sampler.run_mcmc(p0, 100)
 sampler.reset()
-nsteps = 500
+nsteps = 10000
 width = 30
 # sampler.run_mcmc(pos,500) #regular run
 for i, result in enumerate(sampler.sample(pos, iterations=nsteps)):

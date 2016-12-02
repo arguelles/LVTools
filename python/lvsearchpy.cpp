@@ -156,16 +156,14 @@ static double wrap_llhFull(LVSearch* lv,std::vector<double> arg){
   return llh;
 }
 
-/*
-marray<double,3> wrap_GetDataDistribution(LVSearch* lv,std::vector<double> arg){
+marray<double,3> wrap_GetExpectedDistribution(LVSearch* lv,std::vector<double> arg){
   if(arg.size() != 9)
     throw std::runtime_error("Number of arguments should be 9. You sent me " + std::to_string(arg.size()));
   std::array<double,9> argv;
   std::copy_n(arg.begin(),9,argv.begin());
-  auto data = lv->GetDataDistribution(argv);
+  auto data = lv->GetExpectationDistribution(argv);
   return data;
 }
-*/
 
 BOOST_PYTHON_MODULE(lvsearchpy)
 {
@@ -178,6 +176,7 @@ BOOST_PYTHON_MODULE(lvsearchpy)
     .def("llhFull",wrap_llhFull)
     .def("SetVerbose",&LVSearch::SetVerbose)
     .def("GetDataDistribution",&LVSearch::GetDataDistribution)
+    .def("GetExpectationDistribution",wrap_GetExpectedDistribution)
     ;
 
   // python container to vector<double> convertion
