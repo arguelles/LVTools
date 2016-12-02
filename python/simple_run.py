@@ -14,5 +14,5 @@ prompt_flux_path='/Users/carguelles/DropboxMIT/LVSearch/carlos/data/prompt_flux.
 # constructing object
 lvsearch = lv.LVSearch(effective_area_path,events_path,chris_flux_path,kaon_flux_path,pion_flux_path,prompt_flux_path)
 lvsearch.SetVerbose(False)
-print lvsearch.llhFull([-1.,0.,1.,0.,0.,0.,1.0e-28,1.0e-28,1.0e-28])
+print lvsearch.llhFull([1.,0.,1.,0.,0.,0.,1.0e-28,1.0e-28,1.0e-28])
 
