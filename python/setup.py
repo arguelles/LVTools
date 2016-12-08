@@ -17,7 +17,7 @@ else:
     libraries = ['python2.7','boost_python',
                  'SQuIDS','nuSQuIDS',
                  'gsl','gslcblas','m',
-                 'hdf5','hdf5_hl']
+                 'hdf5','hdf5_hl','PhysTools']
 
     if sys.platform.startswith('linux'):
       libraries.append('cxxrt')
