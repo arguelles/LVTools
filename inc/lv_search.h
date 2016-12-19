@@ -197,7 +197,7 @@ double GetAveragedFlux(IntegrateWorkspace &ws, nuSQUIDSAtm<nuSQUIDSLV> *nus, PTy
          2.;
 }
 
-double GetAvgPOsc(IntegrateWorkspace &ws, std::array<double, 3> params, double gamma,  PTypes flavor,
+double GetAvgPOsc(IntegrateWorkspace &ws, std::array<double, 3> params, double nlv,  PTypes flavor,
                   double costh_min, double costh_max, double enu_min, double enu_max) {
   if (enu_min > enu_max)
     throw std::runtime_error("Min energy in the bin larger than large energy in the bin.");
@@ -211,7 +211,7 @@ double GetAvgPOsc(IntegrateWorkspace &ws, std::array<double, 3> params, double g
     return integrate(ws,
                      [&](double enu) {
                        return LV::OscillationProbabilityTwoFlavorLV_intL(
-                           enu, baseline_0, baseline_1, params[0], params[1], params[2], gamma);
+                           enu, baseline_0, baseline_1, params[0], params[1], params[2], nlv);
                      },
                      enu_min, enu_max, integration_error, integration_iterations) /
            (baseline_1 - baseline_0) / (enu_max - enu_min);
@@ -245,7 +245,7 @@ double GetAveragedAstroFlux(IntegrateWorkspace &ws, PTypes flavor, double costh_
   return GetAveragedAstroFlux(ws, flavor, costh_max, enu_min, enu_max);
 }
 
-double GetAvgAstroPOsc(IntegrateWorkspace &ws, std::array<double, 3> params, double gamma, PTypes flavor,
+double GetAvgAstroPOsc(IntegrateWorkspace &ws, std::array<double, 3> params, double nlv, PTypes flavor,
                        double costh_min, double costh_max, double enu_min, double enu_max) {
   if (enu_min > enu_max)
     throw std::runtime_error("Min energy in the bin larger than large energy in the bin.");
@@ -255,7 +255,7 @@ double GetAvgAstroPOsc(IntegrateWorkspace &ws, std::array<double, 3> params, dou
     const unsigned int integration_iterations = 5000;
     return integrate(ws, [&](double enu) {
              return LV::OscillationProbabilityTwoFlavorLV_Astro(enu, params[0], params[1],
-                                                                params[2],gamma);
+                                                                params[2],nlv);
            }, enu_min, enu_max, integration_error, integration_iterations) / (enu_max - enu_min);
   } else {
     throw std::logic_error("MNot implemented.");
@@ -281,7 +281,7 @@ void bin(const ContainerType& data, HistType& hist, const BinnerType& binner){
 
 class LVSearch {
 private:
-  double gamma = 1; // by default c-style constrains
+  double nlv= 1; // by default c-style constrains
   bool quiet = true;
   const double PI_CONSTANT = 3.141592;
   const double m2Tocm2 = 1.0e4;
@@ -372,7 +372,7 @@ public:
   }
 
   void SetVerbose(bool quietness) { quiet = !quietness; }
-  void SetEnergyExponent(double gamma_) { gamma = gamma_;}
+  void SetEnergyExponent(double nlv_) { nlv = nlv_;}
 
 protected:
   void LoadData(std::string data_filename) {
@@ -483,7 +483,7 @@ protected:
       for (unsigned int ei = 0; ei < neutrinoEnergyBins; ei++) {
         for (unsigned int ci = 0; ci < cosZenithBins; ci++) {
           double p_osc =
-              GetAvgPOsc(ws.get(), osc_params, gamma, flavor, edges[y2010][flavor][coszenith_index][ci],
+              GetAvgPOsc(ws.get(), osc_params, nlv, flavor, edges[y2010][flavor][coszenith_index][ci],
                          edges[y2010][flavor][coszenith_index][ci + 1],
                          edges[y2010][flavor][neutrino_energy_index][ei],
                          edges[y2010][flavor][neutrino_energy_index][ei + 1]);
@@ -501,7 +501,7 @@ protected:
               p_osc;
 
           double p_osc_astro =
-              GetAvgAstroPOsc(ws, osc_params, gamma, flavor, edges[y2010][flavor][coszenith_index][ci],
+              GetAvgAstroPOsc(ws, osc_params, nlv, flavor, edges[y2010][flavor][coszenith_index][ci],
                               edges[y2010][flavor][coszenith_index][ci + 1],
                               edges[y2010][flavor][neutrino_energy_index][ei],
                               edges[y2010][flavor][neutrino_energy_index][ei + 1]);
@@ -544,12 +544,12 @@ protected:
       for (unsigned int ci = 0; ci < cosZenithBins; ci++) {
         for (unsigned int ei = 0; ei < neutrinoEnergyBins; ei++) {
           double p_osc =
-              GetAvgPOsc(ws, osc_params, gamma, flavor, edges[y2010][flavor][coszenith_index][ci],
+              GetAvgPOsc(ws, osc_params, nlv, flavor, edges[y2010][flavor][coszenith_index][ci],
                          edges[y2010][flavor][coszenith_index][ci + 1],
                          edges[y2010][flavor][neutrino_energy_index][ei],
                          edges[y2010][flavor][neutrino_energy_index][ei + 1]);
           double p_osc_astro =
-              GetAvgAstroPOsc(ws, osc_params, gamma, flavor, edges[y2010][flavor][coszenith_index][ci],
+              GetAvgAstroPOsc(ws, osc_params, nlv, flavor, edges[y2010][flavor][coszenith_index][ci],
                               edges[y2010][flavor][coszenith_index][ci + 1],
                               edges[y2010][flavor][neutrino_energy_index][ei],
                               edges[y2010][flavor][neutrino_energy_index][ei + 1]);

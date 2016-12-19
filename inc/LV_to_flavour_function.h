@@ -51,7 +51,7 @@ namespace LV {
 
     // This is the function we will plug in
     double OscillationProbabilityTwoFlavorLV(double neutrino_energy /*GeV*/, double baseline, /*km*/
-					     double cmutau_real,double cmutau_imag,double cmumu,double gamma){
+					     double cmutau_real,double cmutau_imag,double cmumu,double nlv){
 
         using namespace std;
         //Oscillation equation parameters
@@ -74,7 +74,7 @@ namespace LV {
         double c2x=cmumu/Dd;
         double s2x=sqrt(pow(cmutau_real,2.0)+pow(cmutau_imag,2.0))/Dd;
         double cet=cmutau_real/sqrt(pow(cmutau_real,2.0)+pow(cmutau_imag,2.0));
-        double Rn=4.0*Dd*neutrino_energy*neutrino_energy/dm32;
+        double Rn=4.0*Dd*pow(neutrino_energy,nlv+1)/dm32;
         double R=sqrt(1.0+Rn*Rn+2.0*Rn*(c2t*c2x+s2t*s2x*cet));
         double sin22T=1.0/R/R*(s2t*s2t+Rn*Rn*s2x*s2x+2.0*Rn*s2t*s2x*cet);
         //Oscillation equation itself
@@ -85,7 +85,7 @@ namespace LV {
 
     // This is the function we will plug in
     double OscillationProbabilityTwoFlavorLV_intL(double neutrino_energy /*GeV*/, double baseline_0, double baseline_1, /*km*/
-        double cmutau_real,double cmutau_imag,double cmumu,double gamma){
+        double cmutau_real,double cmutau_imag,double cmumu,double nlv){
 
         using namespace std;
         //Oscillation equation parameters
@@ -93,7 +93,7 @@ namespace LV {
         double c2x=cmumu/Dd;
         double s2x=sqrt(pow(cmutau_real,2.0)+pow(cmutau_imag,2.0))/Dd;
         double cet=cmutau_real/sqrt(pow(cmutau_real,2.0)+pow(cmutau_imag,2.0));
-        double Rn=4.0*Dd*neutrino_energy*neutrino_energy/dm32;
+        double Rn=4.0*Dd*pow(neutrino_energy,nlv+1)/dm32;
         double R=sqrt(1.0+Rn*Rn+2.0*Rn*(c2t*c2x+s2t*s2x*cet));
         double sin22T=1.0/R/R*(s2t*s2t+Rn*Rn*s2x*s2x+2.0*Rn*s2t*s2x*cet);
         //Oscillation equation itself
@@ -107,7 +107,7 @@ namespace LV {
     }
 
    double OscillationProbabilityTwoFlavorLV_Astro(double neutrino_energy /*GeV*/,
-       double cmutau_real,double cmutau_imag,double cmumu,double gamma){
+       double cmutau_real,double cmutau_imag,double cmumu,double nlv){
 
         using namespace std;
         //Oscillation equation parameters
@@ -115,7 +115,7 @@ namespace LV {
         double c2x=cmumu/Dd;
         double s2x=sqrt(pow(cmutau_real,2.0)+pow(cmutau_imag,2.0))/Dd;
         double cet=cmutau_real/sqrt(pow(cmutau_real,2.0)+pow(cmutau_imag,2.0));
-        double Rn=4.0*Dd*neutrino_energy*neutrino_energy/dm32;
+        double Rn=4.0*Dd*pow(neutrino_energy,nlv+1)/dm32;
         double R=sqrt(1.0+Rn*Rn+2.0*Rn*(c2t*c2x+s2t*s2x*cet));
         double sin22T=1.0/R/R*(s2t*s2t+Rn*Rn*s2x*s2x+2.0*Rn*s2t*s2x*cet);
         //Oscillation equation itself
