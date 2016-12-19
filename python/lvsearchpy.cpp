@@ -175,6 +175,7 @@ BOOST_PYTHON_MODULE(lvsearchpy)
     .def("llh",wrap_llh)
     .def("llhFull",wrap_llhFull)
     .def("SetVerbose",&LVSearch::SetVerbose)
+    .def("SetEnergyExponent",&LVSearch::SetEnergyExponent)
     .def("GetDataDistribution",&LVSearch::GetDataDistribution)
     .def("GetExpectationDistribution",wrap_GetExpectedDistribution)
     ;

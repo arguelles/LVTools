@@ -51,7 +51,7 @@ namespace LV {
 
     // This is the function we will plug in
     double OscillationProbabilityTwoFlavorLV(double neutrino_energy /*GeV*/, double baseline, /*km*/
-					     double cmutau_real,double cmutau_imag,double cmumu){
+					     double cmutau_real,double cmutau_imag,double cmumu,double gamma){
 
         using namespace std;
         //Oscillation equation parameters
@@ -85,7 +85,7 @@ namespace LV {
 
     // This is the function we will plug in
     double OscillationProbabilityTwoFlavorLV_intL(double neutrino_energy /*GeV*/, double baseline_0, double baseline_1, /*km*/
-        double cmutau_real,double cmutau_imag,double cmumu){
+        double cmutau_real,double cmutau_imag,double cmumu,double gamma){
 
         using namespace std;
         //Oscillation equation parameters
@@ -107,7 +107,7 @@ namespace LV {
     }
 
    double OscillationProbabilityTwoFlavorLV_Astro(double neutrino_energy /*GeV*/,
-       double cmutau_real,double cmutau_imag,double cmumu){
+       double cmutau_real,double cmutau_imag,double cmumu,double gamma){
 
         using namespace std;
         //Oscillation equation parameters
