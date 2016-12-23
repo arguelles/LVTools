@@ -703,7 +703,7 @@ public:
     }
     // here we define the priors
     likelihood::UniformPrior positivePrior(0.0, std::numeric_limits<double>::infinity());
-    likelihood::GaussianPrior normalizationPrior(1., 0.4); // 0.4
+    likelihood::LimitedGaussianPrior normalizationPrior(1., 0.4, 0.1, std::numeric_limits<double>::infinity()); // 0.4
     likelihood::GaussianPrior crSlopePrior(0.0, 0.05);
     likelihood::GaussianPrior kaonPrior(1.0, 0.1);
     likelihood::UniformPrior prompt_norm(0.0, std::numeric_limits<double>::infinity());
@@ -736,7 +736,7 @@ public:
     }
     // here we define the priors
     likelihood::UniformPrior positivePrior(0.0, std::numeric_limits<double>::infinity());
-    likelihood::GaussianPrior normalizationPrior(1., 0.4); // 0.4
+    likelihood::LimitedGaussianPrior normalizationPrior(1., 0.4, 0.1, std::numeric_limits<double>::infinity()); // 0.4
     likelihood::GaussianPrior crSlopePrior(0.0, 0.05);
     likelihood::GaussianPrior kaonPrior(1.0, 0.1);
     likelihood::UniformPrior prompt_norm(0.0, std::numeric_limits<double>::infinity());
