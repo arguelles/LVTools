@@ -588,7 +588,7 @@ protected:
                   m2Tocm2 * livetime[year] * areas[year][flavor][ei][ci][pi] * DOM_eff_correction *
                   prompt_fluxIntegral * p_osc;
               astro_event_expectation[year][ci][pi] +=
-                  DOM_eff_correction * solid_angle * m2Tocm2 * livetime[year] *
+                  solid_angle * m2Tocm2 * livetime[year] *
                   areas[year][flavor][ei][ci][pi] * astro_integrated_flux;
               if (kaon_event_expectation[year][ci][pi] < 0)
                 throw std::runtime_error("badness");
