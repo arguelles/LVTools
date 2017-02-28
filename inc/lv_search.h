@@ -644,7 +644,24 @@ protected:
     bin(mc_events, sim_hist, binner);
   }
 
+  std::vector<double> PullBinEdges(unsigned int dim, const HistType& h) const {
+    std::vector<double> edges_i(h.getBinCount(dim));
+    for(unsigned int j=0; j<h.getBinCount(dim); j++)
+      edges_i[j]=h.getBinEdge(dim,j);
+    edges_i.push_back(h.getBinEdge(dim,h.getBinCount(dim)-1)+h.getBinWidth(dim,h.getBinCount(dim)-1));
+    return edges_i;
+  }
+
 public:
+
+  std::vector<double> GetEnergyBins() const {
+    return PullBinEdges(0,data_hist);
+  }
+
+  std::vector<double> GetCosThBins() const {
+    return PullBinEdges(1,data_hist);
+  }
+
   marray<double,3> GetDataDistribution(){
 
     marray<double,3> array {static_cast<size_t>(data_hist.getBinCount(2)),
