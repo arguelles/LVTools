@@ -207,11 +207,21 @@ double GetAvgPOsc(IntegrateWorkspace &ws, std::array<double, 3> params, double n
   const unsigned int integration_iterations = 5000;
 
   double baseline_0 = -earth_diameter * costh_max, baseline_1 = -earth_diameter * costh_min;
-  if (flavor == NUMU || flavor == NUMUBAR) {
+  if (flavor == NUMU) {
     return integrate(ws,
                      [&](double enu) {
                        return LV::OscillationProbabilityTwoFlavorLV_intL(
                            enu, baseline_0, baseline_1, params[0], params[1], params[2], nlv);
+                     },
+                     enu_min, enu_max, integration_error, integration_iterations) /
+           (baseline_1 - baseline_0) / (enu_max - enu_min);
+  } else if (flavor == NUMUBAR) {
+    double sign=1;
+    if (((size_t)nlv)%2==0) sign =-1;
+    return integrate(ws,
+                     [&](double enu) {
+                       return LV::OscillationProbabilityTwoFlavorLV_intL(
+                           enu, baseline_0, baseline_1, sign*params[0], sign*params[1], sign*params[2], nlv);
                      },
                      enu_min, enu_max, integration_error, integration_iterations) /
            (baseline_1 - baseline_0) / (enu_max - enu_min);
@@ -250,13 +260,23 @@ double GetAvgAstroPOsc(IntegrateWorkspace &ws, std::array<double, 3> params, dou
   if (enu_min > enu_max)
     throw std::runtime_error("Min energy in the bin larger than large energy in the bin.");
 
-  if (flavor == NUMU || flavor == NUMUBAR) {
+  if (flavor == NUMU) {
     const double integration_error = 1e-3;
     const unsigned int integration_iterations = 5000;
     return integrate(ws, [&](double enu) {
              return LV::OscillationProbabilityTwoFlavorLV_Astro(enu, params[0], params[1],
                                                                 params[2],nlv);
            }, enu_min, enu_max, integration_error, integration_iterations) / (enu_max - enu_min);
+  } else if (flavor == NUMUBAR) {
+    double sign=1;
+    if (((size_t)nlv)%2==0) sign =-1;
+    const double integration_error = 1e-3;
+    const unsigned int integration_iterations = 5000;
+    return integrate(ws, [&](double enu) {
+             return LV::OscillationProbabilityTwoFlavorLV_Astro(enu, sign*params[0], sign*params[1],
+                                                                sign*params[2],nlv);
+           }, enu_min, enu_max, integration_error, integration_iterations) / (enu_max - enu_min);
+
   } else {
     throw std::logic_error("MNot implemented.");
   }
