@@ -728,6 +728,66 @@ public:
     return array;
   }
 
+  marray<double,2> SpitRealization(std::vector<double> nuisance, int seed) const {
+    std::mt19937 rng;
+    rng.seed(seed);
+
+    DiffuseFitWeighterMaker DFWM;
+    auto weighter=DFWM(nuisance);
+    double expected=0;
+    std::vector<double> weights;
+    for(const Event& e :mc_events){
+      auto w=weighter(e);
+      if(std::isnan(w) || std::isinf(w) || w<0){
+        std::cout << "Bad weight!" << std::endl;
+        std::cout << e.conv_pion_event << ' ' << e.conv_kaon_event << ' ';
+        std::cout << e.energy_proxy << ' ' << e.year << ' ' << w << std::endl;
+      }
+      weights.push_back(w);
+      expected+=w;
+    }
+
+    std::vector<Event> realization=likelihood::generateSample(weights,mc_events,expected,rng);
+
+    marray<double,2> ReturnVec { realization.size(), 6} ;
+
+    for(size_t i=0; i!=realization.size(); ++i)
+      {
+        ReturnVec[i][0]=realization[i].energy_proxy;
+        ReturnVec[i][1]=realization[i].costh;
+        ReturnVec[i][2]=realization[i].year;
+        ReturnVec[i][3]=1.;
+      }
+    return ReturnVec;
+  }
+
+  double Swallow(marray<double,2> Data) {
+    double TotalWeight=0;
+
+    observed_events.clear();
+    for(size_t i=0; i!=Data.extent(0); ++i)
+      {
+        Event e;
+        e.energy_proxy = Data[i][0];
+        e.costh        = Data[i][1];
+        e.year         = Data[i][2];
+        TotalWeight+=Data[i][3];
+        observed_events.push_back(e);
+      }
+    // remaking data histogram
+    data_hist = HistType(LogarithmicAxis(0, 0.1), LinearAxis(0, 0.1), LinearAxis(2010, 1));
+
+    data_hist.getAxis(0)->setLowerLimit(minFitEnergy);
+    data_hist.getAxis(0)->setUpperLimit(maxFitEnergy);
+    data_hist.getAxis(1)->setLowerLimit(minCosth);
+    data_hist.getAxis(1)->setUpperLimit(maxCosth);
+
+    // fill in the histogram with the data
+    bin(observed_events, data_hist, binner);
+
+    return TotalWeight;
+  }
+
   double llhFull(std::array<double, 9> & params){
     // get physics parameters
     std::array<double,3> osc_params {params[6],params[7],params[8]};

@@ -178,6 +178,8 @@ BOOST_PYTHON_MODULE(lvsearchpy)
     .def("SetEnergyExponent",&LVSearch::SetEnergyExponent)
     .def("GetDataDistribution",&LVSearch::GetDataDistribution)
     .def("GetExpectationDistribution",wrap_GetExpectedDistribution)
+    .def("SpitRealization",&LVSearch::SpitRealization)
+    .def("Swallow",&LVSearch::Swallow)
     ;
 
   // python container to vector<double> convertion
