@@ -165,6 +165,29 @@ marray<double,3> wrap_GetExpectedDistribution(LVSearch* lv,std::vector<double> a
   return data;
 }
 
+static double wrap_Swallow(LVSearch* st, PyObject * array){
+  if (! PyArray_Check(array) )
+  {
+    throw std::runtime_error("LVSearch::Error:Input array is not a numpy array.");
+  }
+
+  PyArrayObject* numpy_array = (PyArrayObject*)array;
+  unsigned int array_dim = PyArray_NDIM(numpy_array);
+  NPY_TYPES type = (NPY_TYPES) PyArray_DESCR(numpy_array)->type_num;
+
+  // things i think can cast ok to doubles
+  if (!( type == NPY_LONG or type == NPY_INT or type == NPY_SHORT or type == NPY_FLOAT or
+      type == NPY_DOUBLE or type == NPY_LONGDOUBLE or type == NPY_CFLOAT or type == NPY_CDOUBLE))
+    throw std::runtime_error("LVSearch::Error:Input numpy array cannot be meaninfully casted into double.");
+
+  if ( array_dim == 2 ) {
+    nusquids::marray<double,2> state = numpyarray_to_marray<double,2>(array, type);
+    double value = st->Swallow(state);
+    return value;
+  } else
+    throw std::runtime_error("LVSearch::Input array has wrong dimenions.");
+}
+
 BOOST_PYTHON_MODULE(lvsearchpy)
 {
   // import numpy array definitions
@@ -179,7 +202,7 @@ BOOST_PYTHON_MODULE(lvsearchpy)
     .def("GetDataDistribution",&LVSearch::GetDataDistribution)
     .def("GetExpectationDistribution",wrap_GetExpectedDistribution)
     .def("SpitRealization",&LVSearch::SpitRealization)
-    .def("Swallow",&LVSearch::Swallow)
+    .def("Swallow",wrap_Swallow)
     ;
 
   // python container to vector<double> convertion
