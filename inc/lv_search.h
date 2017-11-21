@@ -243,7 +243,8 @@ double GetAveragedAstroFlux(IntegrateWorkspace &ws, PTypes flavor, double costh,
     return 0.;
 
   if (astro_gamma != -1)
-    return N0 * (pow(enu_min, astro_gamma + 1.) - pow(enu_max, astro_gamma + 1.)) /
+    // return N0 * (pow(enu_min, astro_gamma + 1.) - pow(enu_max, astro_gamma + 1.)) /
+    return N0 * (pow(enu_max, astro_gamma + 1.) - pow(enu_min, astro_gamma + 1.)) /
            (astro_gamma + 1.);
   else
     return N0 * (log(enu_max) - log(enu_min));
@@ -740,7 +741,7 @@ public:
       auto w=weighter(e);
       if(std::isnan(w) || std::isinf(w) || w<0){
         std::cout << "Bad weight!" << std::endl;
-        std::cout << e.conv_pion_event << ' ' << e.conv_kaon_event << ' ';
+        std::cout << e.conv_pion_event << ' ' << e.conv_kaon_event << ' ' << e.prompt_event << ' ' << e.astro_event << ' ';
         std::cout << e.energy_proxy << ' ' << e.year << ' ' << w << std::endl;
       }
       weights.push_back(w);
@@ -749,7 +750,7 @@ public:
 
     std::vector<Event> realization=likelihood::generateSample(weights,mc_events,expected,rng);
 
-    marray<double,2> ReturnVec { realization.size(), 6} ;
+    marray<double,2> ReturnVec { realization.size(), 4} ;
 
     for(size_t i=0; i!=realization.size(); ++i)
       {
