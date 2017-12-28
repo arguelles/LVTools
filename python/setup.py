@@ -10,9 +10,13 @@ if sys.platform == 'win32' or sys.platform == 'win64':
     quit()
 
 else:
-    include_dirs = ['/usr/local/Cellar/python/2.7.9/Frameworks/Python.framework/Versions/2.7/lib/python2.7/../../include/python2.7',
-                    '/Users/carguelles/Library/Python/2.7/lib/python/site-packages/numpy/core/include',
-                    '/usr/local/include',numpy.get_include(),
+    try:
+        COOLCVMFSROOT=os.environ['SROOT']
+    except KeyError:
+        COOLCVMFSROOT= "/usr/local/"
+    include_dirs = [COOLCVMFSROOT+"/include",
+                    numpy.get_include(),
+                    '/usr/local/include',
                     '../inc/',
                     '.']
     libraries = ['python2.7','boost_python',
@@ -32,7 +36,8 @@ else:
                     '/usr/local/Cellar/gsl/1.15/lib',
                     '/usr/local/opt/szip/lib',
                     '/usr/local/lib',
-                    '/usr/local/lib','/home/carguelles/programs/SNOT/local/lib']
+                    '/usr/local/lib','/home/carguelles/programs/SNOT/local/lib',
+                    COOLCVMFSROOT+"/lib",COOLCVMFSROOT+"/lib64"]
 
 files = ['lvsearchpy.cpp']
 

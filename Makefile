@@ -1,8 +1,8 @@
 # Compiler
-CC=clang
-CXX=clang++
-AR=ar
-LD=clang++
+#CC=clang
+#CXX=clang++
+#AR=ar
+#LD=clang++
 
 DYN_SUFFIX=.dylib
 DYN_OPT=-dynamiclib -install_name $(LIBnuSQUIDS)/$(DYN_PRODUCT) -compatibility_version $(VERSION) -current_version $(VERSION)
@@ -21,6 +21,10 @@ MAINS=$(patsubst mains/%.cpp,bin/%.exe,$(MAINS_SRC))
 
 CXXFLAGS= -g -std=c++11 -I./inc -I${PREFIX}/include
 
+CXXFLAGS+=-I${SROOT}/include
+LDFLAGS+=-L${SROOT}/lib
+LDFLAGS+=-L${SROOT}/lib64
+
 # Directories
 
 GSL_CFLAGS=-I/usr/local/Cellar/gsl/1.16/include
@@ -38,7 +42,7 @@ LIBnuSQUIDS=$(PATH_nuSQUIDS)/lib
 
 # FLAGS
 CFLAGS= -O3 -fPIC -I$(INCnuSQUIDS) $(SQUIDS_CFLAGS) $(GSL_CFLAGS) $(HDF5_CFLAGS)
-LDFLAGS= -Wl,-rpath -Wl,$(LIBnuSQUIDS) -L$(LIBnuSQUIDS) -L${PREFIX}/lib #-lsupc++
+LDFLAGS+= -Wl,-rpath -Wl,$(LIBnuSQUIDS) -L$(LIBnuSQUIDS) -L${PREFIX}/lib # -lsupc++
 LDFLAGS+= $(SQUIDS_LDFLAGS) $(GSL_LDFLAGS) $(HDF5_LDFLAGS) $(PHYSTOOLS_LDFLAGS)
 
 # Compilation rules
@@ -51,10 +55,10 @@ bin/%.exe : mains/%.cpp mains/%.o mains/lbfgsb.o mains/linpack.o
 	$(CXX) $(CXXFLAGS) -c $(CFLAGS) $< -o $@
 
 mains/lbfgsb.o : ./inc/lbfgsb/lbfgsb.h ./inc/lbfgsb/lbfgsb.c
-	$(CC) $(CFLAGS) ./inc/lbfgsb/lbfgsb.c -c -o ./mains/lbfgsb.o
+	$(CC) $(CFLAGS) -std=c99 ./inc/lbfgsb/lbfgsb.c -c -o ./mains/lbfgsb.o
 
 mains/linpack.o : ./inc/lbfgsb/linpack.c
-	$(CC) $(CFLAGS) ./inc/lbfgsb/linpack.c -c -o ./mains/linpack.o
+	$(CC) $(CFLAGS) -std=c99 ./inc/lbfgsb/linpack.c -c -o ./mains/linpack.o
 
 .PHONY: clean
 clean:
