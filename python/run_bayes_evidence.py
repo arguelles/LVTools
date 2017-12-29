@@ -28,8 +28,8 @@ logICmutau = float(sys.argv[2]);
 logCmumu = float(sys.argv[3]);
 
 parameters = ["normalization", "cosmic_ray_slope", "pik", "prompt_norm", "astro_norm", "astro_gamma"]
-#parameters_prior_ranges = [[0,10], [-0.5, 0.5], [0., 2], [0, 10], [0, 10], [-5, 5]]
-parameters_prior_ranges = [0,10,-0.5, 0.5,0.,2,0,10,0,10,-5,5]
+#parameters_prior_ranges = [[0,5], [-0.5, 0.5], [0., 2], [0, 10], [0, 10], [-4, 4]]
+parameters_prior_ranges = [0,5,-0.5, 0.5,0.,2,0,10,0,10,-4,4]
 n_params = len(parameters)
 theta = np.zeros(n_params)
 prange = np.zeros(n_params)
