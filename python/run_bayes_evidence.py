@@ -19,7 +19,13 @@ prompt_flux_path='../data/prompt_flux.h5'
 lvsearch = lv.LVSearch(effective_area_path,events_path,chris_flux_path,kaon_flux_path,pion_flux_path,prompt_flux_path)
 lvsearch.SetVerbose(False)
 
-logRCmutau = -40; logICmutau = -40; logCmumu = -40;
+if(len(sys.argv)!=4):
+    print("wrong number of parameters")
+    exit()
+
+logRCmutau = sys.argv[1];
+logICmutau = sys.argv[2];
+logCmumu = sys.argv[3];
 
 parameters = ["normalization", "cosmic_ray_slope", "pik", "prompt_norm", "astro_norm", "astro_gamma"]
 #parameters_prior_ranges = [[0,10], [-0.5, 0.5], [0., 2], [0, 10], [0, 10], [-5, 5]]
