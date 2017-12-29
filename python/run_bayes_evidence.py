@@ -23,9 +23,9 @@ if(len(sys.argv)!=4):
     print("wrong number of parameters")
     exit()
 
-logRCmutau = sys.argv[1];
-logICmutau = sys.argv[2];
-logCmumu = sys.argv[3];
+logRCmutau = float(sys.argv[1]);
+logICmutau = float(sys.argv[2]);
+logCmumu = float(sys.argv[3]);
 
 parameters = ["normalization", "cosmic_ray_slope", "pik", "prompt_norm", "astro_norm", "astro_gamma"]
 #parameters_prior_ranges = [[0,10], [-0.5, 0.5], [0., 2], [0, 10], [0, 10], [-5, 5]]
