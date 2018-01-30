@@ -19,27 +19,32 @@ prompt_flux_path= central_data_path + '/data/prompt_flux.h5'
 # constructing object
 lvsearch = lv.LVSearch(effective_area_path,events_path,chris_flux_path,kaon_flux_path,pion_flux_path,prompt_flux_path)
 lvsearch.SetVerbose(False)
+lvsearch.SetEnergyExponent(3)
+#lvsearch.SetEnergyExponent(2)
 
-#if(len(sys.argv)!=4):
-#    print("wrong number of parameters")
-#    exit()
-#RCmutau = float(sys.argv[1]);
-#ICmutau = float(sys.argv[2]);
-#Cmumu = float(sys.argv[3]);
+batch_mode = False
 
-if(len(sys.argv)!=2):
-    print("wrong number of parameters")
-    exit()
-puntillos = np.genfromtxt('/home/carguelles/monadas/LVTools/scr/lv6_blob_points')
-model_index = int(sys.argv[1])
+if not batch_mode:
+    if(len(sys.argv)!=4):
+        print("wrong number of parameters")
+        exit()
+    RCmutau = float(sys.argv[1]);
+    ICmutau = float(sys.argv[2]);
+    Cmumu = float(sys.argv[3]);
+else:
+    if(len(sys.argv)!=2):
+        print("wrong number of parameters")
+        exit()
+    puntillos = np.genfromtxt('/home/carguelles/monadas/LVTools/scr/lv6_blob_points')
+    model_index = int(sys.argv[1])
 
-RCmutau = puntillos[model_index][1];
-ICmutau = puntillos[model_index][2];
-Cmumu = puntillos[model_index][3];
+    RCmutau = puntillos[model_index][1];
+    ICmutau = puntillos[model_index][2];
+    Cmumu = puntillos[model_index][3];
 
 parameters = ["normalization", "cosmic_ray_slope", "pik", "prompt_norm", "astro_norm", "astro_gamma"]
-#parameters_prior_ranges = [[0,5], [-0.5, 0.5], [0., 2], [0, 10], [0, 10], [-4, 4]]
-parameters_prior_ranges = [0,5,-0.1, 0.1,0.,2,0,10,0,10,-4,4]
+#parameters_prior_ranges = [[0.5,3.], [-0.5, 0.5], [0., 2], [0, 10], [0, 10], [-4, 4]]
+parameters_prior_ranges = [0.5,3, -0.3,0.3, 0.5,1.5, 0,10, 0,10,-1,1]
 n_params = len(parameters)
 theta = np.zeros(n_params)
 prange = np.zeros(n_params)
@@ -64,7 +69,7 @@ prefix = "mnrun_" + str(RCmutau) + "_" + str(ICmutau) + "_" + str(Cmumu) + "_"
 #progress = ProgressPrinter(n_params = n_params, outputfiles_basename=prefix); progress.start()
 print("begin running evidence calculation")
 result = pymultinest.run(LogLikelihood=lnProb, Prior=CubePrior, n_dims=n_params,
-                           outputfiles_basename=prefix, verbose=False)
+                           outputfiles_basename=prefix, verbose=True)
                            #outputfiles_basename='/scratch/carguelles/'+prefix, verbose=False)
 #progress.end()
 print("end running evidence calculation")
@@ -74,7 +79,8 @@ analyzer = pymultinest.Analyzer(outputfiles_basename=prefix, n_params=n_params)
 a_lnZ = analyzer.get_stats()['global evidence']
 print("end analysis")
 
-output_location = '/home/carguelles/monadas/LVTools/scr/metaresults/'
-np.savez(output_location+'lv_evidence_'+prefix+'.npy',RCmutau=RCmutau,ICmutau=ICmutau,Cmumu=Cmumu,a_lnZ=a_lnZ)
+if batch_mode:
+    output_location = '/home/carguelles/monadas/LVTools/scr/metaresults/'
+    np.savez(output_location+'lv_evidence_'+prefix+'.npy',RCmutau=RCmutau,ICmutau=ICmutau,Cmumu=Cmumu,a_lnZ=a_lnZ)
 print("Evidence ", a_lnZ)
 
