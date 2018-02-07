@@ -804,8 +804,10 @@ public:
     likelihood::LimitedGaussianPrior normalizationPrior(1., 0.4, 0.1, std::numeric_limits<double>::infinity()); // 0.4
     likelihood::GaussianPrior crSlopePrior(0.0, 0.05);
     likelihood::GaussianPrior kaonPrior(1.0, 0.1);
-    likelihood::UniformPrior prompt_norm(0.0, std::numeric_limits<double>::infinity());
-    likelihood::UniformPrior astro_norm(0.0, std::numeric_limits<double>::infinity());
+    //likelihood::UniformPrior prompt_norm(0.0, std::numeric_limits<double>::infinity());
+    //likelihood::UniformPrior astro_norm(0.0, std::numeric_limits<double>::infinity());
+    likelihood::LimitedGaussianPrior prompt_norm(0.0, 0.8, 0.0, std::numeric_limits<double>::infinity());
+    likelihood::LimitedGaussianPrior astro_norm(0.0, 1.5, 0.0, std::numeric_limits<double>::infinity());
     likelihood::UniformPrior astro_gamma(-0.5, 0.5);
 
     auto priors = makePriorSet(normalizationPrior, crSlopePrior, kaonPrior, prompt_norm, astro_norm,
